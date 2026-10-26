@@ -19,13 +19,19 @@ export interface BhavikaValidateResult {
 }
 
 export interface BhavikaRedeemResult {
-  success: boolean;
-  isReplay: boolean;
+  redeemed: boolean;
+  replay: boolean;
+  code?: string;
   valueRupees?: number;
   currency?: string;
   externalRef?: string;
   redeemedAt?: string;
   error?: string;
+  errorCode?: string;
+  statusCode?: number;
+  // Aliases for compatibility
+  success: boolean;
+  isReplay: boolean;
 }
 
 /**
@@ -156,9 +162,13 @@ export async function redeemBhavikaCoupon(
       throw new Error("Bhavika integration secret is not configured.");
     }
     return {
+      redeemed: false,
+      replay: false,
       success: false,
       isReplay: false,
       error: "BHAVIKA_INTEGRATION_SECRET is not configured in this environment.",
+      errorCode: "NOT_CONFIGURED",
+      statusCode: 503,
     };
   }
 
@@ -188,28 +198,39 @@ export async function redeemBhavikaCoupon(
 
     if (res.ok && json?.redeemed) {
       return {
+        redeemed: true,
+        replay: Boolean(json.replay),
         success: true,
         isReplay: Boolean(json.replay),
+        code: json.code,
         valueRupees: json.valueRupees,
         currency: json.currency || "INR",
         externalRef: json.externalRef,
         redeemedAt: json.redeemedAt,
+        statusCode: res.status,
       };
     }
 
     return {
+      redeemed: false,
+      replay: false,
       success: false,
       isReplay: false,
-      error: json?.message || json?.error || `Redemption failed (${res.status})`,
+      error: json?.error || json?.message || `Redemption failed (${res.status})`,
+      errorCode: json?.code,
+      statusCode: res.status,
     };
   } catch (err: unknown) {
     return {
+      redeemed: false,
+      replay: false,
       success: false,
       isReplay: false,
       error:
         err instanceof Error
           ? err.message
           : "Network error reaching Bhavika server",
+      statusCode: 0,
     };
   }
 }

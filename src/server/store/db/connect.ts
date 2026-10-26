@@ -32,9 +32,15 @@ export async function getStoreDb(): Promise<Connection> {
   }
 
   if (!cache.promise) {
-    // Intended database name is 'jai_maa_durga', fallback to MONGODB_DB_NAME in test environments.
-    const dbName = process.env.JMD_MONGODB_DB_NAME || (env.NODE_ENV === "test" ? "test_jmd" : "jai_maa_durga");
-    const uri = process.env.JMD_MONGODB_URI || env.MONGODB_URI;
+    // Canonical database name is 'jai_maa_durga' via JMD_MONGODB_DB_NAME (or STORE_MONGODB_DB_NAME alias).
+    const dbName =
+      process.env.JMD_MONGODB_DB_NAME ||
+      process.env.STORE_MONGODB_DB_NAME ||
+      (env.NODE_ENV === "test" ? "test_jmd" : "jai_maa_durga");
+    const uri =
+      process.env.JMD_MONGODB_URI ||
+      process.env.STORE_MONGODB_URI ||
+      env.MONGODB_URI;
 
     cache.promise = new Promise<Connection>((resolve, reject) => {
       const conn = mongoose.createConnection(uri, {
