@@ -27,7 +27,10 @@ process.env.RAZORPAY_KEY_SECRET =
 process.env.CRON_SECRET = process.env.CRON_SECRET || "test_cron_secret_1234567890";
 
 // Start a single-node replica set so Mongo transactions work in tests.
-const replset = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+const replset = await MongoMemoryReplSet.create({
+  instanceOpts: [{ launchTimeout: 60000 }],
+  replSet: { count: 1 },
+});
 process.env.MONGODB_URI = replset.getUri();
 
 // Connect via the app's own helper (registers models) and build unique indexes.
