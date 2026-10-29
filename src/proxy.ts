@@ -6,7 +6,17 @@ import { UserRole } from "@/lib/enums";
 // Edge-safe auth instance (no DB/Credentials providers here).
 const { auth } = NextAuth(authConfig);
 
-export function handleProxyRoute(req: { nextUrl: URL; auth?: any }) {
+export type ProxyRequest = {
+  nextUrl: URL;
+  auth?: {
+    user?: {
+      id?: string;
+      role?: UserRole;
+    };
+  } | null;
+};
+
+export function handleProxyRoute(req: ProxyRequest) {
   const { nextUrl } = req;
   const token = req.auth;
   const isLoggedIn = Boolean(token?.user?.id);

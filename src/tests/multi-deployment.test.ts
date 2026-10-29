@@ -3,7 +3,7 @@ import { handleProxyRoute } from "../proxy";
 
 vi.mock("next-auth", () => ({
   default: () => ({
-    auth: (fn: any) => fn,
+    auth: <T>(fn: T): T => fn,
   }),
 }));
 
@@ -79,8 +79,8 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
   });
 
   describe("Coupon Expiry Cron Guard (/api/cron/expire-coupons)", () => {
-    it("runs coupon expiry on Bhavika deployment (JMD_SITE_MODE != 'true')", async () => {
-      process.env.JMD_SITE_MODE = "false";
+    it("preserves existing Bhavika deployment behavior when ENABLE_CRON_JOBS is unset", async () => {
+      delete process.env.ENABLE_CRON_JOBS;
       delete process.env.ENABLE_COUPON_EXPIRY_CRON;
 
       const { expireCoupons } = await import("@/server/services/coupon.service");
@@ -97,9 +97,8 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
       expect(json.skipped).toBeUndefined();
     });
 
-    it("skips coupon expiry on JMD deployment (JMD_SITE_MODE == 'true')", async () => {
-      process.env.JMD_SITE_MODE = "true";
-      delete process.env.ENABLE_COUPON_EXPIRY_CRON;
+    it("safely skips coupon expiry when ENABLE_CRON_JOBS is explicitly 'false'", async () => {
+      process.env.ENABLE_CRON_JOBS = "false";
 
       const { expireCoupons } = await import("@/server/services/coupon.service");
       const { GET } = await import("../app/api/cron/expire-coupons/route");
@@ -113,29 +112,11 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
       expect(res.status).toBe(200);
       expect(expireCoupons).not.toHaveBeenCalled();
       expect(json.skipped).toBe(true);
-      expect(json.reason).toContain("JMD storefront mode");
+      expect(json.reason).toContain("ENABLE_CRON_JOBS=false");
     });
 
-    it("honors explicit ENABLE_COUPON_EXPIRY_CRON='true' even when JMD_SITE_MODE='true'", async () => {
-      process.env.JMD_SITE_MODE = "true";
-      process.env.ENABLE_COUPON_EXPIRY_CRON = "true";
-
-      const { expireCoupons } = await import("@/server/services/coupon.service");
-      const { GET } = await import("../app/api/cron/expire-coupons/route");
-
-      const req = new Request("http://localhost:3000/api/cron/expire-coupons", {
-        headers: { authorization: "Bearer test" },
-      });
-      const res = await GET(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(expireCoupons).toHaveBeenCalledTimes(1);
-      expect(json.skipped).toBeUndefined();
-    });
-
-    it("honors explicit ENABLE_COUPON_EXPIRY_CRON='false' on Bhavika deployment", async () => {
-      process.env.JMD_SITE_MODE = "false";
+    it("safely skips when ENABLE_COUPON_EXPIRY_CRON is explicitly 'false'", async () => {
+      delete process.env.ENABLE_CRON_JOBS;
       process.env.ENABLE_COUPON_EXPIRY_CRON = "false";
 
       const { expireCoupons } = await import("@/server/services/coupon.service");
@@ -150,14 +131,31 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
       expect(res.status).toBe(200);
       expect(expireCoupons).not.toHaveBeenCalled();
       expect(json.skipped).toBe(true);
-      expect(json.reason).toContain("explicitly disabled");
+      expect(json.reason).toContain("ENABLE_COUPON_EXPIRY_CRON=false");
     });
   });
 
   describe("Refund Reconciliation Cron Guard (/api/cron/reconcile-refunds)", () => {
-    it("skips refund reconciliation on Bhavika deployment (JMD_SITE_MODE != 'true')", async () => {
-      process.env.JMD_SITE_MODE = "false";
+    it("preserves existing Bhavika deployment behavior when ENABLE_CRON_JOBS is unset", async () => {
+      delete process.env.ENABLE_CRON_JOBS;
       delete process.env.ENABLE_REFUND_RECONCILE_CRON;
+
+      const { sweepPendingRefunds } = await import("@/server/store/services/payment.service");
+      const { GET } = await import("../app/api/cron/reconcile-refunds/route");
+
+      const req = new Request("http://localhost:3000/api/cron/reconcile-refunds", {
+        headers: { authorization: "Bearer test" },
+      });
+      const res = await GET(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(sweepPendingRefunds).toHaveBeenCalledTimes(1);
+      expect(json.skipped).toBeUndefined();
+    });
+
+    it("safely skips refund reconciliation when ENABLE_CRON_JOBS is explicitly 'false'", async () => {
+      process.env.ENABLE_CRON_JOBS = "false";
 
       const { sweepPendingRefunds } = await import("@/server/store/services/payment.service");
       const { GET } = await import("../app/api/cron/reconcile-refunds/route");
@@ -171,47 +169,11 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
       expect(res.status).toBe(200);
       expect(sweepPendingRefunds).not.toHaveBeenCalled();
       expect(json.skipped).toBe(true);
-      expect(json.reason).toContain("disabled on Bhavika deployment");
+      expect(json.reason).toContain("ENABLE_CRON_JOBS=false");
     });
 
-    it("runs refund reconciliation on JMD deployment (JMD_SITE_MODE == 'true')", async () => {
-      process.env.JMD_SITE_MODE = "true";
-      delete process.env.ENABLE_REFUND_RECONCILE_CRON;
-
-      const { sweepPendingRefunds } = await import("@/server/store/services/payment.service");
-      const { GET } = await import("../app/api/cron/reconcile-refunds/route");
-
-      const req = new Request("http://localhost:3000/api/cron/reconcile-refunds", {
-        headers: { authorization: "Bearer test" },
-      });
-      const res = await GET(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(sweepPendingRefunds).toHaveBeenCalledTimes(1);
-      expect(json.skipped).toBeUndefined();
-    });
-
-    it("honors explicit ENABLE_REFUND_RECONCILE_CRON='true' on Bhavika deployment", async () => {
-      process.env.JMD_SITE_MODE = "false";
-      process.env.ENABLE_REFUND_RECONCILE_CRON = "true";
-
-      const { sweepPendingRefunds } = await import("@/server/store/services/payment.service");
-      const { GET } = await import("../app/api/cron/reconcile-refunds/route");
-
-      const req = new Request("http://localhost:3000/api/cron/reconcile-refunds", {
-        headers: { authorization: "Bearer test" },
-      });
-      const res = await GET(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(sweepPendingRefunds).toHaveBeenCalledTimes(1);
-      expect(json.skipped).toBeUndefined();
-    });
-
-    it("honors explicit ENABLE_REFUND_RECONCILE_CRON='false' on JMD deployment", async () => {
-      process.env.JMD_SITE_MODE = "true";
+    it("safely skips when ENABLE_REFUND_RECONCILE_CRON is explicitly 'false'", async () => {
+      delete process.env.ENABLE_CRON_JOBS;
       process.env.ENABLE_REFUND_RECONCILE_CRON = "false";
 
       const { sweepPendingRefunds } = await import("@/server/store/services/payment.service");
@@ -226,7 +188,7 @@ describe("Multi-Deployment Storefront Routing & Cron Guards", () => {
       expect(res.status).toBe(200);
       expect(sweepPendingRefunds).not.toHaveBeenCalled();
       expect(json.skipped).toBe(true);
-      expect(json.reason).toContain("explicitly disabled");
+      expect(json.reason).toContain("ENABLE_REFUND_RECONCILE_CRON=false");
     });
   });
 });

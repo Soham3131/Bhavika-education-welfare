@@ -20,22 +20,24 @@ export async function GET(req: Request) {
     return fail("Unauthorized.", 401, { code: "UNAUTHORIZED" });
   }
 
-  // Multi-deployment guard:
-  // When the repository is deployed to both Bhavika and JMD projects,
-  // refund reconciliation is owned by JMD Store (JMD_SITE_MODE === "true").
-  // Can also be explicitly toggled via ENABLE_REFUND_RECONCILE_CRON=true/false.
-  const isJmdMode = process.env.JMD_SITE_MODE === "true";
-  const explicitGuard = process.env.ENABLE_REFUND_RECONCILE_CRON;
-  const isEnabled =
-    explicitGuard !== undefined ? explicitGuard === "true" : isJmdMode;
-
-  if (!isEnabled) {
+  // Cron execution guard:
+  // When ENABLE_CRON_JOBS is explicitly set to "false", safely skip job execution.
+  // When unset, preserve existing Bhavika deployment behavior.
+  if (process.env.ENABLE_CRON_JOBS === "false") {
     return ok({
       ok: true,
       skipped: true,
-      reason: !isJmdMode
-        ? "Store refund reconciliation cron is disabled on Bhavika deployment (JMD_SITE_MODE != true)"
-        : "Store refund reconciliation cron is explicitly disabled via ENABLE_REFUND_RECONCILE_CRON=false",
+      reason: "Cron jobs are explicitly disabled via ENABLE_CRON_JOBS=false",
+      ranAt: new Date().toISOString(),
+    });
+  }
+
+  // Optional deployment-specific override
+  if (process.env.ENABLE_REFUND_RECONCILE_CRON === "false") {
+    return ok({
+      ok: true,
+      skipped: true,
+      reason: "Refund reconciliation cron is explicitly disabled via ENABLE_REFUND_RECONCILE_CRON=false",
       ranAt: new Date().toISOString(),
     });
   }

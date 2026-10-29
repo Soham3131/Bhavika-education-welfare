@@ -24,22 +24,24 @@ export async function GET(req: Request) {
     return fail("Unauthorized.", 401, { code: "UNAUTHORIZED" });
   }
 
-  // Multi-deployment guard:
-  // When the repository is deployed to both Bhavika and JMD projects,
-  // coupon expiry is owned by Bhavika (JMD_SITE_MODE != true).
-  // Can also be explicitly toggled via ENABLE_COUPON_EXPIRY_CRON=true/false.
-  const isJmdMode = process.env.JMD_SITE_MODE === "true";
-  const explicitGuard = process.env.ENABLE_COUPON_EXPIRY_CRON;
-  const isEnabled =
-    explicitGuard !== undefined ? explicitGuard === "true" : !isJmdMode;
-
-  if (!isEnabled) {
+  // Cron execution guard:
+  // When ENABLE_CRON_JOBS is explicitly set to "false", safely skip job execution.
+  // When unset, preserve existing Bhavika deployment behavior.
+  if (process.env.ENABLE_CRON_JOBS === "false") {
     return ok({
       ok: true,
       skipped: true,
-      reason: isJmdMode
-        ? "Bhavika coupon expiry cron is disabled in JMD storefront mode (JMD_SITE_MODE=true)"
-        : "Bhavika coupon expiry cron is explicitly disabled via ENABLE_COUPON_EXPIRY_CRON=false",
+      reason: "Cron jobs are explicitly disabled via ENABLE_CRON_JOBS=false",
+      ranAt: new Date().toISOString(),
+    });
+  }
+
+  // Optional deployment-specific override
+  if (process.env.ENABLE_COUPON_EXPIRY_CRON === "false") {
+    return ok({
+      ok: true,
+      skipped: true,
+      reason: "Bhavika coupon expiry cron is explicitly disabled via ENABLE_COUPON_EXPIRY_CRON=false",
       ranAt: new Date().toISOString(),
     });
   }
