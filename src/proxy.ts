@@ -6,13 +6,25 @@ import { UserRole } from "@/lib/enums";
 // Edge-safe auth instance (no DB/Credentials providers here).
 const { auth } = NextAuth(authConfig);
 
-export default auth((req) => {
+export function handleProxyRoute(req: { nextUrl: URL; auth?: any }) {
   const { nextUrl } = req;
   const token = req.auth;
   const isLoggedIn = Boolean(token?.user?.id);
   const isAdmin = token?.user?.role === UserRole.ADMIN;
 
   const path = nextUrl.pathname;
+
+  // Project-specific storefront routing:
+  // When JMD_SITE_MODE="true" (Jai Maa Durga deployment):
+  //   Requests to "/" render the existing JMD storefront from "/store".
+  // When JMD_SITE_MODE is not set or false (Bhavika Foundation deployment):
+  //   Requests to "/" render the standard Bhavika homepage.
+  // Never rewrites /api, authentication callbacks, static assets, or store API routes.
+  if (process.env.JMD_SITE_MODE === "true" && path === "/") {
+    const url = new URL("/store", nextUrl);
+    return NextResponse.rewrite(url);
+  }
+
   const isDashboard = path.startsWith("/dashboard");
   // Guard the admin portal only — not sibling routes like /admin-login.
   const isAdminArea = path === "/admin" || path.startsWith("/admin/");
@@ -35,7 +47,9 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
+
+export default auth(handleProxyRoute);
 
 function redirectToLogin(nextUrl: URL) {
   const url = new URL("/login", nextUrl);

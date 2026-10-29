@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
   },
   // Keep the Mongoose/bcrypt native-ish deps external to the server bundle.
   serverExternalPackages: ["mongoose", "bcryptjs"],
+  experimental: {
+    cpus: process.env.BUILD_CPUS ? Number(process.env.BUILD_CPUS) : undefined,
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

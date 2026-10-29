@@ -42,6 +42,7 @@ const schema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
   // Phase 2 integration (Jai Maa Durga) — not required in Phase 1
+  JMD_SITE_MODE: z.string().optional(),
   JMD_INTEGRATION_URL: z.string().optional(),
   JMD_INTEGRATION_SECRET: z.string().optional(),
   JMD_REDEMPTION_ENABLED: z
@@ -53,6 +54,8 @@ const schema = z.object({
   // sends it as `Authorization: Bearer <CRON_SECRET>`. Without it the cron
   // endpoints refuse every caller, so they can never be triggered publicly.
   CRON_SECRET: z.string().optional(),
+  ENABLE_COUPON_EXPIRY_CRON: z.string().optional(),
+  ENABLE_REFUND_RECONCILE_CRON: z.string().optional(),
 
   // Razorpay (donations). key_id is safe to expose to the client; the secret and
   // webhook secret are server-only. All optional so the app runs without them —

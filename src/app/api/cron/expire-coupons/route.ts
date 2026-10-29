@@ -23,6 +23,27 @@ export async function GET(req: Request) {
   if (!isCronAuthorized(req)) {
     return fail("Unauthorized.", 401, { code: "UNAUTHORIZED" });
   }
+
+  // Multi-deployment guard:
+  // When the repository is deployed to both Bhavika and JMD projects,
+  // coupon expiry is owned by Bhavika (JMD_SITE_MODE != true).
+  // Can also be explicitly toggled via ENABLE_COUPON_EXPIRY_CRON=true/false.
+  const isJmdMode = process.env.JMD_SITE_MODE === "true";
+  const explicitGuard = process.env.ENABLE_COUPON_EXPIRY_CRON;
+  const isEnabled =
+    explicitGuard !== undefined ? explicitGuard === "true" : !isJmdMode;
+
+  if (!isEnabled) {
+    return ok({
+      ok: true,
+      skipped: true,
+      reason: isJmdMode
+        ? "Bhavika coupon expiry cron is disabled in JMD storefront mode (JMD_SITE_MODE=true)"
+        : "Bhavika coupon expiry cron is explicitly disabled via ENABLE_COUPON_EXPIRY_CRON=false",
+      ranAt: new Date().toISOString(),
+    });
+  }
+
   const result = await expireCoupons();
   return ok({ ok: true, ...result, ranAt: new Date().toISOString() });
 }
