@@ -16,6 +16,7 @@ export type StoreCouponSource =
 
 export const StoreCouponStatus = {
   ACTIVE: "ACTIVE",
+  LOCKED_IN_CHECKOUT: "LOCKED_IN_CHECKOUT",
   REDEEMED: "REDEEMED",
   EXPIRED: "EXPIRED",
   CANCELLED: "CANCELLED",
@@ -33,6 +34,8 @@ export interface IStoreCoupon {
   sourceRef?: string | null;
   status: StoreCouponStatus;
   expiresAt: Date;
+  lockedOrderRef?: string | null;
+  lockedExpiresAt?: Date | null;
   redeemedAt?: Date | null;
   redeemedOrderRef?: string | null;
   isEligibleForDraw: boolean;
@@ -89,6 +92,17 @@ export const StoreCouponSchema = new Schema<IStoreCouponDoc>(
       required: true,
       index: true,
     },
+    lockedOrderRef: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    lockedExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     redeemedAt: {
       type: Date,
       default: null,
@@ -125,6 +139,7 @@ export const StoreCouponSchema = new Schema<IStoreCouponDoc>(
 StoreCouponSchema.index({ member: 1, status: 1 });
 StoreCouponSchema.index({ status: 1, expiresAt: 1 });
 StoreCouponSchema.index({ source: 1, sourceRef: 1 });
+StoreCouponSchema.index({ lockedOrderRef: 1, status: 1 });
 
 export function getStoreCouponModel(
   conn: Connection,

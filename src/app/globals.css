@@ -108,6 +108,38 @@
 
   /* ---- Container ---- */
   --breakpoint-xs: 22rem;
+
+  /* ---- Jai Maa Durga Store Brand System ---- */
+  --color-jmd-maroon: #6b0b1a;
+  --color-jmd-maroon-dark: #4a0711;
+  --color-jmd-maroon-deep: #3b060d;
+  --color-jmd-maroon-light: #831023;
+  --color-jmd-maroon-50: #fbf2f3;
+  --color-jmd-maroon-100: #f7e4e7;
+
+  --color-jmd-ivory: #fdfbf7;
+  --color-jmd-cream: #f9f6f0;
+  --color-jmd-cream-surface: #ffffff;
+  --color-jmd-cream-dark: #f3ede2;
+
+  --color-jmd-gold: #c5a059;
+  --color-jmd-gold-light: #e5c378;
+  --color-jmd-gold-dark: #997833;
+  --color-jmd-gold-muted: #d4af37;
+
+  --color-jmd-red: #a91b2e;
+  --color-jmd-red-dark: #8b1323;
+  --color-jmd-red-light: #c41e3a;
+
+  --color-jmd-charcoal: #1f2937;
+  --color-jmd-charcoal-dark: #111827;
+  --color-jmd-text-muted: #6b7280;
+
+  --color-jmd-border: #ebdcb9;
+  --color-jmd-border-light: #f4ecda;
+  --color-jmd-border-dark: #d8c495;
+
+  --font-serif: var(--font-playfair), "Cinzel", "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 /* Base layer ------------------------------------------------------------ */

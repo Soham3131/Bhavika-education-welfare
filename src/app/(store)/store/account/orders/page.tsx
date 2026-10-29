@@ -96,31 +96,31 @@ export default function OrderHistoryPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+    <div className="max-w-4xl mx-auto space-y-6 font-sans">
+      <div className="border-b border-[#EBDCB9]/70 pb-4">
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#6B0B1A] tracking-tight">
           My Order History
         </h1>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-gray-500 mt-1">
           Track previous orders, Bhavika coupon redemptions, and delivery status
         </p>
       </div>
 
       {orders.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-4">
-          <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+        <div className="bg-white p-12 text-center rounded-2xl border border-[#EBDCB9] shadow-xs space-y-4">
+          <div className="w-12 h-12 bg-[#FAF7F2] text-[#6B0B1A] border border-[#EBDCB9] rounded-full flex items-center justify-center mx-auto">
             <Package className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-bold text-slate-800">
+          <h2 className="font-serif text-lg font-bold text-gray-800">
             No Orders Placed Yet
           </h2>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
             When you purchase items or redeem Bhavika coupons, your order
             history will appear here.
           </p>
           <Link
             href="/store/products"
-            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition"
+            className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-[#6B0B1A] text-white rounded-md text-xs font-semibold hover:bg-[#831023] transition shadow-xs"
           >
             <span>Start Shopping</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -131,7 +131,7 @@ export default function OrderHistoryPage() {
           {orders.map((order) => (
             <div
               key={order.orderRef}
-              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:border-amber-300 transition"
+              className="bg-white p-5 rounded-xl border border-[#EBDCB9] shadow-2xs space-y-4 hover:border-[#C5A059] transition"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div className="space-y-0.5">

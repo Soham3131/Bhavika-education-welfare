@@ -17,6 +17,8 @@ export type OrderPaymentStatus =
   | "UNPAID"
   | "PENDING"
   | "CAPTURED"
+  | "SETTLED_COUPONS"
+  | "REFUND_PENDING"
   | "PARTIALLY_REFUNDED"
   | "REFUNDED"
   | "FAILED";
@@ -41,6 +43,12 @@ export interface IShippingAddress {
   country: string;
 }
 
+export type OrderCompensationStatus =
+  | "NONE"
+  | "AWAITING_CLIENT_POLICY_APPROVAL"
+  | "COMPENSATED"
+  | "FAILED";
+
 export interface IStoreOrder {
   orderRef: string;
   memberId: Types.ObjectId;
@@ -50,11 +58,18 @@ export interface IStoreOrder {
   taxPaise: number;
   shippingFeePaise: number;
   couponDiscountPaise: number;
+  settledStoreCouponsPaise: number;
+  settledBhavikaCouponsPaise: number;
   netPayablePaise: number;
   paidCashPaise: number;
   deficitPaise: number;
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
+  compensationStatus?: OrderCompensationStatus;
+  refundRequiredPaise?: number;
+  refundedPaise?: number;
+  refundedAt?: Date;
+  refundId?: string;
   stockReservationExpiresAt: Date;
   paidAt?: Date;
   cancelledAt?: Date;
@@ -195,6 +210,26 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
         message: "couponDiscountPaise must be an integer",
       },
     },
+    settledStoreCouponsPaise: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: "settledStoreCouponsPaise must be an integer",
+      },
+    },
+    settledBhavikaCouponsPaise: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: "settledBhavikaCouponsPaise must be an integer",
+      },
+    },
     netPayablePaise: {
       type: Number,
       required: true,
@@ -249,6 +284,8 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
         "UNPAID",
         "PENDING",
         "CAPTURED",
+        "SETTLED_COUPONS",
+        "REFUND_PENDING",
         "PARTIALLY_REFUNDED",
         "REFUNDED",
         "FAILED",
@@ -262,6 +299,17 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
       required: true,
       index: true,
     },
+    compensationStatus: {
+      type: String,
+      enum: [
+        "NONE",
+        "AWAITING_CLIENT_POLICY_APPROVAL",
+        "COMPENSATED",
+        "FAILED",
+      ],
+      default: "NONE",
+      index: true,
+    },
     paidAt: {
       type: Date,
     },
@@ -273,6 +321,21 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
       trim: true,
     },
     notes: {
+      type: String,
+      trim: true,
+    },
+    refundRequiredPaise: {
+      type: Number,
+      min: 0,
+    },
+    refundedPaise: {
+      type: Number,
+      min: 0,
+    },
+    refundedAt: {
+      type: Date,
+    },
+    refundId: {
       type: String,
       trim: true,
     },

@@ -148,21 +148,21 @@ export default function StoreRechargePage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-ink-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#EBDCB9]/70 pb-4">
         <div>
-          <h1 className="text-2xl font-black text-ink-900 tracking-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#6B0B1A] tracking-tight">
             Bill Payments & Recharges
           </h1>
-          <p className="text-sm text-ink-500 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             Instant mobile, DTH, utility recharges with guaranteed member cashback commissions
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-right">
-            <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+          <div className="p-3 bg-[#FAF7F2] border border-[#EBDCB9] rounded-xl text-right">
+            <div className="text-[10px] font-bold text-[#6B0B1A] uppercase tracking-wider">
               Available Wallet Balance
             </div>
-            <div className="text-lg font-black text-amber-950">
+            <div className="text-lg font-black text-gray-900">
               ₹{walletBalance.toFixed(2)}
             </div>
           </div>
@@ -204,8 +204,8 @@ export default function StoreRechargePage() {
               }}
               className={`p-3.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-xs font-bold ${
                 isSelected
-                  ? "bg-brand-600 border-brand-600 text-white shadow-xs"
-                  : "bg-white border-ink-200 text-ink-700 hover:border-ink-300 hover:bg-ink-50/50"
+                  ? "bg-[#6B0B1A] border-[#6B0B1A] text-white shadow-xs"
+                  : "bg-white border-[#EBDCB9] text-gray-700 hover:border-[#C5A059] hover:bg-[#FAF7F2]"
               }`}
             >
               <Icon className="w-5 h-5" />

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Noto_Sans_Devanagari } from "next/font/google";
+import { Poppins, Noto_Sans_Devanagari, Playfair_Display } from "next/font/google";
 import { Toaster } from "sonner";
 import { SITE } from "@/lib/constants";
 import "./globals.css";
@@ -20,6 +20,14 @@ const notoDevanagari = Noto_Sans_Devanagari({
   variable: "--font-noto-devanagari",
   subsets: ["devanagari"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+// Editorial serif typeface for Jai Maa Durga luxury headings.
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -79,7 +87,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${notoDevanagari.variable} h-full antialiased`}
+      className={`${poppins.variable} ${notoDevanagari.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background">
         {children}

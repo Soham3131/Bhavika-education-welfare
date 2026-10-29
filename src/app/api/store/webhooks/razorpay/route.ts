@@ -42,6 +42,15 @@ export const POST = handle(async (req) => {
           notes?: Record<string, string>;
         };
       };
+      refund?: {
+        entity?: {
+          id: string;
+          payment_id: string;
+          amount: number;
+          status: string;
+          notes?: Record<string, string>;
+        };
+      };
     };
   };
 
@@ -75,13 +84,25 @@ export const POST = handle(async (req) => {
           rawWebhookPayload: eventPayload as Record<string, unknown>,
         });
 
-        // Trigger post-payment checkout
-        await processPostPaymentCheckout({
-          orderRef: attempt.orderRef,
-          paymentAttemptId: attempt._id.toString(),
-        });
+        // Trigger post-payment checkout (catches refund-pending states to acknowledge webhook cleanly)
+        try {
+          await processPostPaymentCheckout({
+            orderRef: attempt.orderRef,
+            paymentAttemptId: attempt._id.toString(),
+          });
+        } catch (postCheckoutErr) {
+          console.warn(
+            `[Razorpay Webhook] Post-payment checkout for order ${attempt.orderRef} entered refund/reconciliation:`,
+            postCheckoutErr,
+          );
+        }
       }
     }
+  }
+
+  if (eventPayload.event === "refund.processed" || eventPayload.event === "refund.failed") {
+    const { handleRazorpayRefundWebhook } = await import("@/server/store/services/payment.service");
+    await handleRazorpayRefundWebhook(eventPayload);
   }
 
   return ok({ received: true });

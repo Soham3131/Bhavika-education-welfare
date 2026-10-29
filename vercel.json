@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/expire-coupons",
       "schedule": "30 18 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-refunds",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

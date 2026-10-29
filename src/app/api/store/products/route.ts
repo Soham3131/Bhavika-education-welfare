@@ -32,6 +32,7 @@ export const GET = handle(async (req) => {
   return ok({
     products: products.map((p) => {
       const cat = p.category as unknown as { name?: string; slug?: string };
+      const attrs = (p.attributes || {}) as Record<string, unknown>;
       return {
         id: p._id.toString(),
         sku: p.sku,
@@ -41,10 +42,16 @@ export const GET = handle(async (req) => {
         categorySlug: cat?.slug || "",
         basePricePaise: p.basePricePaise,
         priceRupees: p.basePricePaise / 100,
+        originalPriceRupees:
+          typeof attrs.originalPriceRupees === "number"
+            ? attrs.originalPriceRupees
+            : undefined,
         stock: p.stock,
         availableStock: Math.max(0, p.stock - p.reservedStock),
         images: p.images,
         description: p.description,
+        badge: typeof attrs.badge === "string" ? attrs.badge : undefined,
+        attributes: p.attributes,
       };
     }),
   });

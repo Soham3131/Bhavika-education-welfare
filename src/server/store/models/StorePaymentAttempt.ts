@@ -24,6 +24,18 @@ export interface IStorePaymentAttempt {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
+  razorpayRefundId?: string;
+  refundAmountPaise?: number;
+  refundAttemptCycle?: number;
+  lastRefundStatus?: "processed" | "pending" | "failed";
+  refundHistory?: Array<{
+    refundId?: string;
+    amountPaise: number;
+    idempotencyKey: string;
+    status: "processed" | "pending" | "failed";
+    failureReason?: string;
+    createdAt: Date;
+  }>;
   status: PaymentAttemptStatus;
   errorDetails?: string;
   webhookProcessedAt?: Date;
@@ -106,6 +118,34 @@ export const StorePaymentAttemptSchema = new Schema<IStorePaymentAttemptDoc>(
       type: String,
       trim: true,
     },
+    razorpayRefundId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    refundAmountPaise: {
+      type: Number,
+      min: 0,
+    },
+    refundAttemptCycle: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    lastRefundStatus: {
+      type: String,
+      enum: ["processed", "pending", "failed"],
+    },
+    refundHistory: [
+      {
+        refundId: { type: String, trim: true },
+        amountPaise: { type: Number, required: true },
+        idempotencyKey: { type: String, required: true },
+        status: { type: String, enum: ["processed", "pending", "failed"], required: true },
+        failureReason: { type: String },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     status: {
       type: String,
       enum: [

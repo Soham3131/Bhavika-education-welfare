@@ -20,6 +20,7 @@ export interface IExternalCouponRedemption {
   redeemedAt?: Date;
   isReplay: boolean;
   lastRedeemError?: string;
+  failureCategory?: "DEFINITIVE_REJECTION" | "AMBIGUOUS_TIMEOUT";
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -104,6 +105,10 @@ export const ExternalCouponRedemptionSchema =
       },
       lastRedeemError: {
         type: String,
+      },
+      failureCategory: {
+        type: String,
+        enum: ["DEFINITIVE_REJECTION", "AMBIGUOUS_TIMEOUT"],
       },
       metadata: {
         type: Schema.Types.Mixed,

@@ -15,7 +15,6 @@ import {
 
 interface AppliedCoupon {
   code: string;
-  valueRupees: number;
 }
 
 export default function CheckoutPage() {
@@ -34,7 +33,6 @@ export default function CheckoutPage() {
   });
 
   const [couponCodeInput, setCouponCodeInput] = useState("");
-  const [couponValueInput, setCouponValueInput] = useState("500");
   const [appliedCoupons, setAppliedCoupons] = useState<AppliedCoupon[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -62,18 +60,84 @@ export default function CheckoutPage() {
       .catch(() => router.push("/store/login?redirect=/store/checkout"));
   }, [router]);
 
-  const itemsTotalRupees = items.reduce(
-    (acc, it) => acc + it.priceRupees * it.quantity,
-    0,
-  );
-  const totalCouponDiscountRupees = appliedCoupons.reduce(
-    (acc, c) => acc + c.valueRupees,
-    0,
-  );
-  const netPayableRupees = Math.max(
-    0,
-    itemsTotalRupees - totalCouponDiscountRupees,
-  );
+  interface ServerQuote {
+    itemsTotalRupees: number;
+    shippingFeeRupees: number;
+    couponDiscountRupees: number;
+    totalPayableRupees: number;
+    qualifiesForFreeShipping: boolean;
+    appliedCoupons?: {
+      code: string;
+      valueRupees: number;
+      valuePaise: number;
+      source: string;
+    }[];
+  }
+
+  const [serverQuote, setServerQuote] = useState<ServerQuote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  // Fetch authoritative server quote whenever items or appliedCoupons change
+  useEffect(() => {
+    if (items.length === 0) {
+      return;
+    }
+
+    let isMounted = true;
+
+    fetch("/api/store/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+        })),
+        couponCodes: appliedCoupons.map((c) => c.code),
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to calculate authoritative order quote.");
+        }
+        if (isMounted) {
+          setServerQuote({
+            itemsTotalRupees: data.itemsTotalRupees,
+            shippingFeeRupees: data.shippingFeeRupees,
+            couponDiscountRupees: data.couponDiscountRupees,
+            totalPayableRupees: data.totalPayableRupees,
+            qualifiesForFreeShipping: data.qualifiesForFreeShipping,
+            appliedCoupons: data.appliedCoupons,
+          });
+          setQuoteError(null);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setQuoteError(err.message);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [items, appliedCoupons]);
+
+  // When cart has no items, quote is null
+  const activeQuote = items.length === 0 ? null : serverQuote;
+
+  // Fallback estimates only while server quote is calculating initially
+  const fallbackItemsTotal = items.reduce((acc, it) => acc + it.priceRupees * it.quantity, 0);
+  const fallbackShipping = fallbackItemsTotal >= 999 || fallbackItemsTotal === 0 ? 0 : 99;
+  const fallbackDiscount = activeQuote ? activeQuote.couponDiscountRupees : 0;
+
+  const itemsTotalRupees = activeQuote ? activeQuote.itemsTotalRupees : fallbackItemsTotal;
+  const shippingFeeRupees = activeQuote ? activeQuote.shippingFeeRupees : fallbackShipping;
+  const totalCouponDiscountRupees = activeQuote ? activeQuote.couponDiscountRupees : fallbackDiscount;
+  const netPayableRupees = activeQuote
+    ? activeQuote.totalPayableRupees
+    : Math.max(0, fallbackItemsTotal + fallbackShipping - fallbackDiscount);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +149,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    const value = parseInt(couponValueInput, 10) || 500;
-    setAppliedCoupons((prev) => [...prev, { code: cleanCode, valueRupees: value }]);
+    setAppliedCoupons((prev) => [...prev, { code: cleanCode }]);
     setCouponCodeInput("");
     setErrorMessage(null);
   };
@@ -127,7 +190,7 @@ export default function CheckoutPage() {
             quantity: i.quantity,
           })),
           shippingAddress: address,
-          coupons: appliedCoupons,
+          couponCodes: appliedCoupons.map((c) => c.code),
         }),
       });
 
@@ -207,25 +270,25 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <div className="border-b border-slate-200 pb-4">
+    <div className="max-w-5xl mx-auto space-y-8 font-sans">
+      <div className="border-b border-[#EBDCB9]/70 pb-4">
         <Link
           href="/store/cart"
-          className="inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-500 hover:text-amber-600 transition mb-2"
+          className="inline-flex items-center space-x-1.5 text-xs font-semibold text-gray-500 hover:text-[#6B0B1A] transition mb-2"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Cart</span>
         </Link>
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#6B0B1A] tracking-tight">
           Checkout & Order Confirmation
         </h1>
-        <p className="text-xs text-slate-500">
-          Enter delivery address and apply Bhavika bearer coupons
+        <p className="text-xs text-gray-500 mt-1">
+          Enter delivery address and apply verified Bhavika bearer coupons
         </p>
       </div>
 
       {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-medium">
           {errorMessage}
         </div>
       )}
@@ -234,8 +297,8 @@ export default function CheckoutPage() {
         {/* Address and Coupon Section */}
         <div className="lg:col-span-2 space-y-6">
           {/* Shipping Address */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h2 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">
+          <div className="bg-white p-6 rounded-xl border border-[#EBDCB9] shadow-2xs space-y-4">
+            <h2 className="font-serif text-base font-bold text-[#6B0B1A] border-b border-[#EBDCB9]/60 pb-2.5">
               1. Delivery Address
             </h2>
 
@@ -359,18 +422,18 @@ export default function CheckoutPage() {
           </div>
 
           {/* Bhavika Coupon Redemption */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
-              <Ticket className="w-4 h-4 text-amber-600" />
-              <h2 className="font-bold text-slate-900 text-sm">
+          <div className="bg-white p-6 rounded-xl border border-[#EBDCB9] shadow-2xs space-y-4">
+            <div className="flex items-center space-x-2 border-b border-[#EBDCB9]/60 pb-3">
+              <Ticket className="w-4 h-4 text-[#C5A059]" />
+              <h2 className="font-serif text-base font-bold text-[#6B0B1A]">
                 2. Apply Bhavika Foundation Coupons
               </h2>
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-gray-500">
                 You can apply multiple Bhavika bearer coupons on a single order.
-                Each coupon is independently redeemed and reconciled.
+                Each coupon is independently verified and redeemed at 100% face value.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-2">
@@ -379,23 +442,12 @@ export default function CheckoutPage() {
                   placeholder="e.g. BHAV-7K2X-9QM4-P8RT"
                   value={couponCodeInput}
                   onChange={(e) => setCouponCodeInput(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                  className="flex-1 px-3 py-2 bg-[#FAF7F2] border border-[#EBDCB9] rounded-md text-xs font-mono uppercase focus:outline-none focus:ring-1 focus:ring-[#6B0B1A]"
                 />
-                <select
-                  value={couponValueInput}
-                  onChange={(e) => setCouponValueInput(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 font-medium"
-                >
-                  <option value="100">₹100 Coupon</option>
-                  <option value="200">₹200 Coupon</option>
-                  <option value="300">₹300 Coupon</option>
-                  <option value="500">₹500 Coupon</option>
-                  <option value="1000">₹1,000 Coupon</option>
-                </select>
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
-                  className="inline-flex items-center justify-center space-x-1.5 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition"
+                  className="inline-flex items-center justify-center space-x-1.5 px-4 py-2 bg-[#6B0B1A] hover:bg-[#831023] text-white rounded-md text-xs font-semibold transition shadow-2xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Coupon</span>
@@ -404,33 +456,48 @@ export default function CheckoutPage() {
 
               {appliedCoupons.length > 0 && (
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-semibold text-slate-700">
+                  <span className="text-xs font-semibold text-gray-700">
                     Applied Coupons:
                   </span>
                   <div className="space-y-1.5">
-                    {appliedCoupons.map((c) => (
-                      <div
-                        key={c.code}
-                        className="flex items-center justify-between p-2.5 bg-amber-50/60 border border-amber-200 rounded-lg text-xs"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <Ticket className="w-3.5 h-3.5 text-amber-600" />
-                          <span className="font-mono font-bold text-amber-900">
-                            {c.code}
-                          </span>
-                          <span className="text-amber-700 font-semibold">
-                            (₹{c.valueRupees} discount)
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCoupon(c.code)}
-                          className="text-slate-400 hover:text-rose-600 transition p-1"
+                    {appliedCoupons.map((c) => {
+                      const verified = serverQuote?.appliedCoupons?.find(
+                        (ac) => ac.code === c.code,
+                      );
+                      return (
+                        <div
+                          key={c.code}
+                          className="flex items-center justify-between p-2.5 bg-[#FAF7F2] border border-[#EBDCB9] rounded-md text-xs"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="flex items-center space-x-2">
+                            <Ticket className="w-3.5 h-3.5 text-[#C5A059]" />
+                            <span className="font-mono font-bold text-[#6B0B1A]">
+                              {c.code}
+                            </span>
+                            {verified ? (
+                              <span className="text-emerald-700 font-semibold">
+                                (₹{verified.valueRupees} discount)
+                              </span>
+                            ) : quoteError ? (
+                              <span className="text-rose-600 text-xs">
+                                Verification failed
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 text-xs">
+                                Verifying discount...
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCoupon(c.code)}
+                            className="text-gray-400 hover:text-rose-600 transition p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -439,44 +506,51 @@ export default function CheckoutPage() {
         </div>
 
         {/* Order Review & Pay Card */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 h-fit">
-          <h2 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">
+        <div className="bg-white p-6 rounded-xl border border-[#EBDCB9] shadow-2xs space-y-6 h-fit">
+          <h2 className="font-serif text-lg font-bold text-[#6B0B1A] border-b border-[#EBDCB9]/60 pb-3">
             Payment Summary
           </h2>
 
           <div className="space-y-3 text-xs">
-            <div className="flex justify-between text-slate-600">
+            <div className="flex justify-between text-gray-600">
               <span>Items Total ({items.reduce((acc, it) => acc + it.quantity, 0)} units)</span>
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-gray-900">
                 ₹{itemsTotalRupees.toLocaleString("en-IN")}
               </span>
             </div>
 
             {totalCouponDiscountRupees > 0 && (
-              <div className="flex justify-between text-emerald-600 font-semibold">
+              <div className="flex justify-between text-emerald-700 font-semibold">
                 <span>Coupon Discount ({appliedCoupons.length})</span>
                 <span>-₹{totalCouponDiscountRupees.toLocaleString("en-IN")}</span>
               </div>
             )}
 
-            <div className="flex justify-between text-slate-600">
+            <div className="flex justify-between text-gray-600">
               <span>Delivery Fee</span>
-              <span className="font-semibold text-emerald-600">Free</span>
+              <span className={`font-semibold ${shippingFeeRupees === 0 ? "text-emerald-700" : "text-gray-900"}`}>
+                {shippingFeeRupees === 0 ? "FREE" : `₹${shippingFeeRupees}`}
+              </span>
             </div>
 
-            <div className="border-t border-slate-200 pt-3 flex justify-between text-sm font-black text-slate-900">
+            <div className="border-t border-[#EBDCB9]/60 pt-3 flex justify-between text-sm font-bold text-gray-900">
               <span>Net Payable</span>
-              <span className="text-amber-600">
+              <span className="text-base text-[#6B0B1A]">
                 ₹{netPayableRupees.toLocaleString("en-IN")}
               </span>
             </div>
           </div>
 
           <div className="space-y-3 pt-2">
+            {quoteError && (
+              <div className="text-[11px] text-rose-700 bg-rose-50 p-2 rounded border border-rose-200">
+                {quoteError}
+              </div>
+            )}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center space-x-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl text-xs shadow-md transition"
+              className="w-full flex items-center justify-center space-x-2 bg-[#6B0B1A] hover:bg-[#831023] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-md text-xs shadow-xs transition"
             >
               <Lock className="w-3.5 h-3.5" />
               <span>
@@ -487,7 +561,7 @@ export default function CheckoutPage() {
                   : `Pay ₹${netPayableRupees.toLocaleString("en-IN")} & Place Order`}
               </span>
             </button>
-            <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
+            <div className="flex items-center justify-center space-x-1.5 text-[11px] text-gray-400">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span>Secured 256-bit encrypted checkout</span>
             </div>

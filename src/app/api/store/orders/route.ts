@@ -1,10 +1,9 @@
-import { handle, ok, fail } from "@/server/http";
+import { handle, ok } from "@/server/http";
 import { requireStoreMember } from "@/server/store/auth/session";
 import {
   createStoreOrder,
   getStoreOrderHistory,
 } from "@/server/store/services/order.service";
-import { registerExternalCouponsForOrder } from "@/server/store/services/checkout.service";
 import { z } from "zod";
 
 const createOrderSchema = z.object({
@@ -26,12 +25,12 @@ const createOrderSchema = z.object({
     postalCode: z.string().trim().min(4, "Postal code required"),
     country: z.string().trim().default("India"),
   }),
+  couponCodes: z.array(z.string().trim().min(1)).optional(),
   coupons: z
     .array(
       z.object({
-        code: z.string().trim().toUpperCase(),
-        valueRupees: z.number().min(1),
-      }),
+        code: z.string().trim().min(1),
+      }).passthrough(),
     )
     .optional(),
 });
@@ -41,10 +40,14 @@ export const POST = handle(async (req) => {
   const body = await req.json();
   const parsed = createOrderSchema.parse(body);
 
-  let totalCouponDiscountPaise = 0;
-  if (parsed.coupons && parsed.coupons.length > 0) {
+  // Extract coupon codes only. Client-supplied discount amounts are never trusted.
+  const rawCodes: string[] = [];
+  if (parsed.couponCodes) {
+    rawCodes.push(...parsed.couponCodes);
+  }
+  if (parsed.coupons) {
     for (const c of parsed.coupons) {
-      totalCouponDiscountPaise += c.valueRupees * 100;
+      if (c.code) rawCodes.push(c.code);
     }
   }
 
@@ -52,28 +55,8 @@ export const POST = handle(async (req) => {
     memberId: session.storeMemberId,
     items: parsed.items,
     shippingAddress: parsed.shippingAddress,
-    couponDiscountPaise: totalCouponDiscountPaise,
+    couponCodes: rawCodes,
   });
-
-  if (parsed.coupons && parsed.coupons.length > 0) {
-    try {
-      await registerExternalCouponsForOrder({
-        orderRef: order.orderRef,
-        orderId: order._id.toString(),
-        memberId: session.storeMemberId,
-        coupons: parsed.coupons.map((c) => ({
-          code: c.code,
-          valueRupees: c.valueRupees,
-          discountAppliedPaise: c.valueRupees * 100,
-        })),
-      });
-    } catch (err: unknown) {
-      return fail(
-        err instanceof Error ? err.message : "Error registering coupons",
-        400,
-      );
-    }
-  }
 
   return ok({
     success: true,

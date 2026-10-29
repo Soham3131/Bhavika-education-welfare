@@ -31,7 +31,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return [];
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (it) => typeof it?.productId === "string" && /^[0-9a-fA-F]{24}$/.test(it.productId),
+        );
+      }
+      return [];
     } catch {
       return [];
     }

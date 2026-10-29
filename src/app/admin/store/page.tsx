@@ -535,18 +535,18 @@ export default function AdminStorePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-ink-100 pb-4">
+      <div className="flex items-center justify-between border-b border-[#EBDCB9]/70 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-ink-900">
+          <h1 className="font-serif text-2xl font-bold text-[#6B0B1A]">
             Jai Maa Durga Store Administration
           </h1>
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-gray-500 mt-0.5">
             Manage catalogue, stock reservations, orders, and deficit reconciliation
           </p>
         </div>
         <button
           onClick={refreshData}
-          className="p-2 border border-ink-200 text-ink-700 hover:bg-ink-50 rounded-lg text-xs font-semibold flex items-center space-x-1"
+          className="p-2 border border-[#EBDCB9] text-gray-700 hover:bg-[#FAF7F2] rounded-lg text-xs font-semibold flex items-center space-x-1"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh</span>
@@ -560,13 +560,13 @@ export default function AdminStorePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-ink-200 space-x-6 text-xs font-bold">
+      <div className="flex border-b border-[#EBDCB9] space-x-6 text-xs font-bold overflow-x-auto pb-0.5">
         <button
           onClick={() => setActiveTab("products")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "products"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Package className="w-4 h-4" />
@@ -575,10 +575,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("categories")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "categories"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -587,10 +587,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("orders")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "orders"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <ShoppingBag className="w-4 h-4" />
@@ -599,10 +599,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("inventory")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "inventory"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Sliders className="w-4 h-4" />
@@ -611,10 +611,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("membership")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "membership"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Award className="w-4 h-4" />
@@ -623,10 +623,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("commissions")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "commissions"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Coins className="w-4 h-4" />
@@ -635,10 +635,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("coupons")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "coupons"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Ticket className="w-4 h-4" />
@@ -647,10 +647,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("referrals")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "referrals"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Users className="w-4 h-4" />
@@ -659,10 +659,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("recharges")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "recharges"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Zap className="w-4 h-4" />
@@ -671,10 +671,10 @@ export default function AdminStorePage() {
 
         <button
           onClick={() => setActiveTab("draws")}
-          className={`pb-3 flex items-center space-x-1.5 ${
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
             activeTab === "draws"
-              ? "border-b-2 border-brand-500 text-brand-600"
-              : "text-ink-500 hover:text-ink-800"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
           }`}
         >
           <Trophy className="w-4 h-4" />
