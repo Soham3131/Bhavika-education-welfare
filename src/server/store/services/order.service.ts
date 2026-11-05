@@ -22,6 +22,7 @@ import {
   settleOrderCommission,
 } from "./commission.service";
 import { DomainError } from "@/server/errors";
+import { AdminAuditLog } from "@/server/models";
 
 import {
   resolveAuthoritativeCoupons,
@@ -34,6 +35,7 @@ export interface CreateOrderInput {
   shippingAddress: IShippingAddress;
   couponCodes?: string[];
   couponDiscountPaise?: number;
+  paymentMethod?: "ONLINE_RAZORPAY" | "COD";
   customCouponValidator?: (
     code: string,
   ) => Promise<{ valid: boolean; valueRupees?: number; error?: string }>;
@@ -158,7 +160,7 @@ export async function createStoreOrder(
     if (jewelleryCategories.length > 0) {
       const SettingsModel = getStoreSettingsModel(db);
       const settingsDoc = await SettingsModel.findOne({ singletonKey: "DEFAULT_SETTINGS" }).lean();
-      const caApproved = settingsDoc?.settings?.jewellery?.caApprovalConfirmed ?? false;
+      const caApproved = settingsDoc?.settings?.jewellery?.caApprovalConfirmed === true;
       if (!caApproved) {
         throw new DomainError(
           "Jewellery checkout is gated pending written Chartered Accountant confirmation of GST tax rates.",
@@ -291,7 +293,35 @@ export async function createStoreOrder(
     quantity: item.quantity,
     unitPricePaise: item.unitPricePaise,
     totalPricePaise: item.totalPricePaise,
+    taxPaise: item.taxPaise ?? 0,
   }));
+
+  // Determine initial paymentMethod and status
+  let orderPaymentMethod: "ONLINE_RAZORPAY" | "COD" | "ZERO_CASH_COUPONS" = "ONLINE_RAZORPAY";
+  let initialOrderStatus: OrderStatus = "PENDING_PAYMENT";
+  let initialPaymentStatus: OrderPaymentStatus = "UNPAID";
+
+  if (cartSummary.totalPayablePaise === 0 && authoritativeCoupons && authoritativeCoupons.coupons.length > 0) {
+    orderPaymentMethod = "ZERO_CASH_COUPONS";
+  } else if (input.paymentMethod === "COD") {
+    const SettingsModel = getStoreSettingsModel(db);
+    const settingsDoc = await SettingsModel.findOne({ singletonKey: "DEFAULT_SETTINGS" }).lean();
+    const codEnabled = settingsDoc?.settings?.cod?.codEnabled ?? true;
+    const maxCodPaise = settingsDoc?.settings?.cod?.maxOrderAmountPaise ?? 500_000;
+    if (!codEnabled) {
+      throw new DomainError("Cash on Delivery is currently disabled.", 400, "COD_DISABLED");
+    }
+    if (cartSummary.totalPayablePaise > maxCodPaise) {
+      throw new DomainError(
+        `Cash on Delivery is restricted to orders up to ₹${(maxCodPaise / 100).toLocaleString()}. Please choose online payment.`,
+        400,
+        "COD_LIMIT_EXCEEDED",
+      );
+    }
+    orderPaymentMethod = "COD";
+    initialOrderStatus = "PROCESSING";
+    initialPaymentStatus = "PENDING";
+  }
 
   const order = new Order({
     orderRef,
@@ -307,8 +337,9 @@ export async function createStoreOrder(
     netPayablePaise: cartSummary.totalPayablePaise,
     paidCashPaise: 0,
     deficitPaise: 0,
-    status: "PENDING_PAYMENT",
-    paymentStatus: "UNPAID",
+    status: initialOrderStatus,
+    paymentStatus: initialPaymentStatus,
+    paymentMethod: orderPaymentMethod,
     stockReservationExpiresAt,
   });
 
@@ -858,4 +889,49 @@ export async function recoverOrderCompensation(orderRef: string): Promise<{
     isReplay: res.isReplay,
   };
 }
+
+/**
+ * Confirms physical cash collection for a Cash on Delivery (COD) order upon delivery.
+ * Strictly prevents marking COD orders as paid before physical collection is verified.
+ */
+export async function confirmCodPayment(input: {
+  orderRef: string;
+  adminId: string | Types.ObjectId;
+}): Promise<IStoreOrderDoc> {
+  const db = await getStoreDb();
+  const Order = getStoreOrderModel(db);
+  const order = await Order.findOne({ orderRef: input.orderRef });
+  if (!order) {
+    throw new DomainError(`Order ${input.orderRef} not found`, 404, "ORDER_NOT_FOUND");
+  }
+  if (order.paymentMethod !== "COD") {
+    throw new DomainError("Order is not a Cash on Delivery order.", 400, "NOT_COD_ORDER");
+  }
+  if (order.paymentStatus === "CAPTURED") {
+    return order; // Idempotent
+  }
+
+  const adminObjectId = new Types.ObjectId(input.adminId);
+  order.paymentStatus = "CAPTURED";
+  order.status = "DELIVERED";
+  order.paidCashPaise = order.netPayablePaise;
+  order.paidAt = new Date();
+  order.codConfirmedAt = new Date();
+  await order.save();
+
+  await AdminAuditLog.create({
+    admin: adminObjectId,
+    action: "ORDER_COD_PAYMENT_CONFIRMED",
+    targetType: "STORE_ORDER",
+    targetId: order._id.toString(),
+    meta: {
+      orderRef: order.orderRef,
+      amountPaise: order.netPayablePaise,
+      confirmedAt: order.codConfirmedAt,
+    },
+  });
+
+  return order;
+}
+
 

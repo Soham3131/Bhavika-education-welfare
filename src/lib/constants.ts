@@ -34,6 +34,14 @@ export const SITE = {
 } as const;
 
 /**
+ * Canonical registration URL for Bhavika Education & Welfare Foundation.
+ * Configurable via NEXT_PUBLIC_BHAVIKA_REGISTER_URL; defaults to Bhavika's /register route.
+ */
+export const BHAVIKA_REGISTER_URL =
+  process.env.NEXT_PUBLIC_BHAVIKA_REGISTER_URL ||
+  `${process.env.NEXT_PUBLIC_SITE_URL || SITE.url}/register`;
+
+/**
  * Primary public navigation. Ordered so the engagement platform (Quiz,
  * Rewards, Leaderboard) sits mid-bar rather than buried — it is the reason
  * most visitors register. Secondary pages (Mission & Vision, Videos,

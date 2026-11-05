@@ -85,3 +85,21 @@ export async function requireStoreAdmin(
   await verifyStoreAdminCapability(admin, capability, auditContext);
   return admin;
 }
+
+/**
+ * Returns the authenticated store admin user if present and granted the required capability,
+ * or null if unauthenticated or unauthorized. Does not throw.
+ */
+export async function getStoreAdminSession(
+  capability: StoreAdminCapability = "STORE_ORDER_MANAGE",
+): Promise<StoreAdminUser | null> {
+  try {
+    const { getSessionUser } = await import("@/server/auth/session");
+    const user = await getSessionUser();
+    if (!user || user.role !== "ADMIN") return null;
+    await verifyStoreAdminCapability(user, capability);
+    return user;
+  } catch {
+    return null;
+  }
+}

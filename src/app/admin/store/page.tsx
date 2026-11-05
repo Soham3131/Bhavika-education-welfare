@@ -14,6 +14,11 @@ import {
   Users,
   Zap,
   Trophy,
+  Gem,
+  KeyRound,
+  Calendar,
+  Printer,
+  Gift,
 } from "lucide-react";
 
 interface AdminProduct {
@@ -159,12 +164,88 @@ interface AdminDraw {
   randomSeed?: string | null;
 }
 
+interface AdminRates {
+  goldRatePerGramRupees: number;
+  silverRatePerGramRupees: number;
+  goldMakingChargePerGramRupees: number;
+  silverMakingChargePerGramRupees: number;
+  metalGstRateBasisPoints: number;
+  makingGstRateBasisPoints: number;
+  stoneGstRateBasisPoints: number;
+  caApprovalConfirmed: boolean;
+  codEnabled: boolean;
+  maxOrderAmountRupees: number;
+  lastUpdated?: string;
+}
+
+interface AdminPromoPlan {
+  planCode: string;
+  name: string;
+  description: string;
+  priceRupees: number;
+  productWalletBenefitRupees: number;
+  superCouponCount: number;
+  superCouponType: string;
+  superCouponFaceValueRupees: number;
+  isPurchaseActive: boolean;
+}
+
+interface AdminPin {
+  _id: string;
+  pinCode: string;
+  tier: string;
+  faceValuePaise: number;
+  status: string;
+  ownerMember?: { name: string; phone: string; memberId: string };
+  purchaserMember?: { name: string; phone: string; memberId: string };
+  createdAt: string;
+}
+
+interface AdminEmi {
+  _id: string;
+  emiRef: string;
+  orderRef: string;
+  totalPrincipalPaise: number;
+  totalInstalments: number;
+  paidInstalmentsCount: number;
+  status: string;
+  cancellationRequested: boolean;
+  cancellationReason?: string;
+  member?: { name: string; phone: string; memberId: string };
+  createdAt: string;
+}
+
+interface AdminWithdrawal {
+  _id: string;
+  withdrawalRef: string;
+  member?: { name: string; phone: string; memberId: string; tier: string };
+  walletType: string;
+  amountPaise: number;
+  status: string;
+  bankDetails: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  providerPayoutRef?: string | null;
+  payoutProvider?: string | null;
+  createdAt: string;
+}
+
 export default function AdminStorePage() {
   const [activeTab, setActiveTab] = useState<
     | "products"
     | "categories"
     | "orders"
     | "inventory"
+    | "rates"
+    | "promoPlans"
+    | "pins"
+    | "emis"
+    | "withdrawals"
     | "membership"
     | "commissions"
     | "coupons"
@@ -172,6 +253,24 @@ export default function AdminStorePage() {
     | "recharges"
     | "draws"
   >("products");
+
+  const [ratesData, setRatesData] = useState<AdminRates | null>(null);
+  const [promoPlans, setPromoPlans] = useState<AdminPromoPlan[]>([]);
+  const [pinsList, setPinsList] = useState<AdminPin[]>([]);
+  const [withdrawalsList, setWithdrawalsList] = useState<AdminWithdrawal[]>([]);
+  const [emisList, setEmisList] = useState<AdminEmi[]>([]);
+  const [ratesForm, setRatesForm] = useState<AdminRates>({
+    goldRatePerGramRupees: 7500,
+    silverRatePerGramRupees: 95,
+    goldMakingChargePerGramRupees: 450,
+    silverMakingChargePerGramRupees: 15,
+    metalGstRateBasisPoints: 300,
+    makingGstRateBasisPoints: 500,
+    stoneGstRateBasisPoints: 300,
+    caApprovalConfirmed: true,
+    codEnabled: true,
+    maxOrderAmountRupees: 5000,
+  });
 
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -249,8 +348,13 @@ export default function AdminStorePage() {
       fetch("/api/admin/store/referrals").then((r) => r.json()),
       fetch("/api/admin/store/recharge").then((r) => r.json()),
       fetch("/api/admin/store/draws").then((r) => r.json()),
+      fetch("/api/admin/store/rates").then((r) => r.json()),
+      fetch("/api/admin/store/promotional-plans").then((r) => r.json()),
+      fetch("/api/admin/store/pins").then((r) => r.json()),
+      fetch("/api/admin/store/emi").then((r) => r.json()),
+      fetch("/api/admin/store/withdrawals").then((r) => r.json()),
     ])
-      .then(([pRes, cRes, oRes, mRes, commRes, cpnRes, refRes, rchRes, drwRes]) => {
+      .then(([pRes, cRes, oRes, mRes, commRes, cpnRes, refRes, rchRes, drwRes, ratesRes, promoRes, pinRes, emiRes, wRes]) => {
         if (pRes.products) setProducts(pRes.products);
         if (cRes.categories) setCategories(cRes.categories);
         if (oRes.orders) setOrders(oRes.orders);
@@ -260,6 +364,14 @@ export default function AdminStorePage() {
         if (refRes) setReferralsData(refRes);
         if (rchRes.recharges) setRecharges(rchRes.recharges);
         if (drwRes.draws) setDraws(drwRes.draws);
+        if (ratesRes.rates) {
+          setRatesData(ratesRes.rates);
+          setRatesForm(ratesRes.rates);
+        }
+        if (promoRes.plans) setPromoPlans(promoRes.plans);
+        if (pinRes.pins) setPinsList(pinRes.pins);
+        if (emiRes.emis) setEmisList(emiRes.emis);
+        if (wRes && wRes.withdrawals) setWithdrawalsList(wRes.withdrawals);
       })
       .catch(() => {});
   };
@@ -276,8 +388,13 @@ export default function AdminStorePage() {
       fetch("/api/admin/store/referrals").then((r) => r.json()),
       fetch("/api/admin/store/recharge").then((r) => r.json()),
       fetch("/api/admin/store/draws").then((r) => r.json()),
+      fetch("/api/admin/store/rates").then((r) => r.json()),
+      fetch("/api/admin/store/promotional-plans").then((r) => r.json()),
+      fetch("/api/admin/store/pins").then((r) => r.json()),
+      fetch("/api/admin/store/emi").then((r) => r.json()),
+      fetch("/api/admin/store/withdrawals").then((r) => r.json()),
     ])
-      .then(([pRes, cRes, oRes, mRes, commRes, cpnRes, refRes, rchRes, drwRes]) => {
+      .then(([pRes, cRes, oRes, mRes, commRes, cpnRes, refRes, rchRes, drwRes, ratesRes, promoRes, pinRes, emiRes, wRes]) => {
         if (!active) return;
         if (pRes.products) setProducts(pRes.products);
         if (cRes.categories) setCategories(cRes.categories);
@@ -288,6 +405,14 @@ export default function AdminStorePage() {
         if (refRes) setReferralsData(refRes);
         if (rchRes.recharges) setRecharges(rchRes.recharges);
         if (drwRes.draws) setDraws(drwRes.draws);
+        if (ratesRes.rates) {
+          setRatesData(ratesRes.rates);
+          setRatesForm(ratesRes.rates);
+        }
+        if (promoRes.plans) setPromoPlans(promoRes.plans);
+        if (pinRes.pins) setPinsList(pinRes.pins);
+        if (emiRes.emis) setEmisList(emiRes.emis);
+        if (wRes && wRes.withdrawals) setWithdrawalsList(wRes.withdrawals);
         setLoading(false);
       })
       .catch(() => {
@@ -297,6 +422,64 @@ export default function AdminStorePage() {
       active = false;
     };
   }, []);
+
+  const handleSaveRates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ratesForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update rates");
+      setMsg(data.message || "Jewellery pricing and GST settings updated successfully.");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error saving rates");
+    }
+  };
+
+  const handleUpdatePromoPlan = async (
+    planCode: string,
+    updates: Partial<AdminPromoPlan>,
+  ) => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/promotional-plans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planCode, ...updates }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update promotional plan");
+      setMsg(data.message || "Promotional plan updated.");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error updating promotional plan");
+    }
+  };
+
+  const handleApproveEmi = async (
+    emiId: string,
+    decision: "APPROVE" | "REJECT",
+  ) => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/emi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emiId, decision }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process EMI decision");
+      setMsg(data.message || "EMI decision processed.");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error with EMI decision");
+    }
+  };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -533,6 +716,92 @@ export default function AdminStorePage() {
     }
   };
 
+  const handleApproveWithdrawal = async (withdrawalId: string) => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/withdrawals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "APPROVE", withdrawalId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Approval failed");
+      setMsg(data.message || "Withdrawal approved!");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error approving withdrawal");
+    }
+  };
+
+  const handleProcessWithdrawal = async (withdrawalId: string) => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/withdrawals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "PROCESS", withdrawalId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to move to processing");
+      setMsg(data.message || "Withdrawal moved to processing queue!");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error updating withdrawal");
+    }
+  };
+
+  const handleRejectWithdrawal = async (withdrawalId: string) => {
+    const rejectionReason = window.prompt(
+      "Enter rejection reason (will be logged and funds refunded):",
+    );
+    if (!rejectionReason) return;
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/withdrawals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "REJECT",
+          withdrawalId,
+          rejectionReason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Rejection failed");
+      setMsg(
+        data.message || "Withdrawal rejected and funds refunded to member!",
+      );
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error rejecting withdrawal");
+    }
+  };
+
+  const handleConfirmPayout = async (withdrawalId: string) => {
+    const providerPayoutRef = window.prompt(
+      "Enter banking settlement reference (UTR / Payout Reference ID):",
+    );
+    if (!providerPayoutRef) return;
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/store/withdrawals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "CONFIRM_PAYOUT",
+          withdrawalId,
+          providerPayoutRef,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Payout confirmation failed");
+      setMsg(data.message || "Payout settlement confirmed!");
+      refreshData();
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Error confirming payout");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between border-b border-[#EBDCB9]/70 pb-4">
@@ -679,6 +948,66 @@ export default function AdminStorePage() {
         >
           <Trophy className="w-4 h-4" />
           <span>Lucky Draws ({draws.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("rates")}
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
+            activeTab === "rates"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <Gem className="w-4 h-4" />
+          <span>Bullion & Jewellery GST</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("promoPlans")}
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
+            activeTab === "promoPlans"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <Gift className="w-4 h-4" />
+          <span>Promotional Plans ({promoPlans.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("pins")}
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
+            activeTab === "pins"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <KeyRound className="w-4 h-4" />
+          <span>Activation PINs ({pinsList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("emis")}
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
+            activeTab === "emis"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>EMI Plans ({emisList.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("withdrawals")}
+          className={`pb-3 flex items-center space-x-1.5 shrink-0 ${
+            activeTab === "withdrawals"
+              ? "border-b-2 border-[#6B0B1A] text-[#6B0B1A]"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <Coins className="w-4 h-4" />
+          <span>Withdrawals ({withdrawalsList.length})</span>
         </button>
       </div>
 
@@ -945,6 +1274,7 @@ export default function AdminStorePage() {
                     <th className="p-3">Deficit</th>
                     <th className="p-3">Status</th>
                     <th className="p-3">Payment</th>
+                    <th className="p-3 text-right">Invoice</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100">
@@ -981,6 +1311,17 @@ export default function AdminStorePage() {
                       </td>
                       <td className="p-3 text-ink-600 font-medium">
                         {o.paymentStatus}
+                      </td>
+                      <td className="p-3 text-right">
+                        <a
+                          href={`/api/store/orders/${o.orderRef}/invoice`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 bg-ink-900 text-white hover:bg-ink-800 rounded-md font-bold text-[10px]"
+                        >
+                          <Printer className="w-3 h-3" />
+                          <span>PDF</span>
+                        </a>
                       </td>
                     </tr>
                   ))}
@@ -1970,6 +2311,675 @@ export default function AdminStorePage() {
                                 {d.status === "CANCELLED" && (
                                   <div className="text-[10px] text-ink-400 italic">
                                     Cancelled
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bullion & Jewellery GST Tab */}
+          {activeTab === "rates" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-ink-100 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-100 pb-4">
+                  <div>
+                    <h3 className="font-bold text-sm text-ink-900 flex items-center space-x-1.5">
+                      <Gem className="w-4 h-4 text-amber-600" />
+                      <span>Bullion Rates, Jewellery GST & Cash-on-Delivery</span>
+                    </h3>
+                    <p className="text-xs text-ink-500 mt-1">
+                      Configure authoritative daily gold/silver rates, making charges per gram, CA-approved GST rates, and COD restrictions.
+                    </p>
+                  </div>
+                  {ratesData?.lastUpdated && (
+                    <div className="text-[11px] text-ink-400 font-mono">
+                      Last updated: {new Date(ratesData.lastUpdated).toLocaleString("en-IN")}
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveRates} className="space-y-6">
+                  {/* Metal Rates */}
+                  <div>
+                    <h4 className="text-xs font-bold text-ink-700 uppercase tracking-wider mb-3">
+                      1. Bullion Daily Rates (₹/gram)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          24K Gold Rate (₹/g)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          required
+                          value={ratesForm.goldRatePerGramRupees}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              goldRatePerGramRupees: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          999 Silver Rate (₹/g)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          required
+                          value={ratesForm.silverRatePerGramRupees}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              silverRatePerGramRupees: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Making Charges */}
+                  <div>
+                    <h4 className="text-xs font-bold text-ink-700 uppercase tracking-wider mb-3">
+                      2. Per-Gram Making Charges (₹/gram)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          Gold Making Charge (₹/g)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          required
+                          value={ratesForm.goldMakingChargePerGramRupees}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              goldMakingChargePerGramRupees: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          Silver Making Charge (₹/g)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          required
+                          value={ratesForm.silverMakingChargePerGramRupees}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              silverMakingChargePerGramRupees: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Approved GST Rates */}
+                  <div>
+                    <h4 className="text-xs font-bold text-ink-700 uppercase tracking-wider mb-3">
+                      3. CA-Approved GST Rates (Basis Points: 100 bps = 1%)
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          Metal GST (300 bps = 3%)
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={ratesForm.metalGstRateBasisPoints}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              metalGstRateBasisPoints: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          Making Charge GST (500 bps = 5%)
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={ratesForm.makingGstRateBasisPoints}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              makingGstRateBasisPoints: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink-700 mb-1">
+                          Stone/Nagina GST (300 bps = 3%)
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={ratesForm.stoneGstRateBasisPoints}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              stoneGstRateBasisPoints: Number(e.target.value),
+                            })
+                          }
+                          className="w-full p-2.5 border border-ink-200 rounded-xl text-xs font-bold text-ink-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CA Approval & COD Toggles */}
+                  <div>
+                    <h4 className="text-xs font-bold text-ink-700 uppercase tracking-wider mb-3">
+                      4. Checkout Safeguards & Payment Methods
+                    </h4>
+                    <div className="space-y-3 bg-ink-50 p-4 rounded-xl text-xs">
+                      <label className="flex items-center space-x-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={ratesForm.caApprovalConfirmed}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              caApprovalConfirmed: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-bold text-ink-900">
+                          CA Approval Confirmed (Enables jewellery checkout with approved GST treatment)
+                        </span>
+                      </label>
+
+                      <label className="flex items-center space-x-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={ratesForm.codEnabled}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              codEnabled: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-bold text-ink-900">
+                          Cash on Delivery (COD) Enabled
+                        </span>
+                      </label>
+
+                      <div className="pt-2 flex items-center gap-3">
+                        <label className="font-semibold text-ink-700 whitespace-nowrap">
+                          Maximum COD Order Value (₹):
+                        </label>
+                        <input
+                          type="number"
+                          value={ratesForm.maxOrderAmountRupees}
+                          onChange={(e) =>
+                            setRatesForm({
+                              ...ratesForm,
+                              maxOrderAmountRupees: Number(e.target.value),
+                            })
+                          }
+                          className="w-36 p-2 border border-ink-200 rounded-lg text-xs font-bold bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 bg-[#6B0B1A] hover:bg-[#520914] text-white text-xs font-bold rounded-xl shadow-xs transition"
+                    >
+                      Save Jewellery & GST Settings
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Promotional Plans Tab */}
+          {activeTab === "promoPlans" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-ink-100 shadow-sm space-y-4">
+                <div>
+                  <h3 className="font-bold text-sm text-ink-900 flex items-center space-x-1.5">
+                    <Gift className="w-4 h-4 text-brand-600" />
+                    <span>Promotional Membership Plans (Plan 1 & Plan 2)</span>
+                  </h3>
+                  <p className="text-xs text-ink-500 mt-1">
+                    Client-specified promotional tiers with atomic wallet credits and Super Coupon issuance. Purchases remain gated until client business confirmation.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {promoPlans.map((plan) => (
+                    <div
+                      key={plan.planCode}
+                      className="p-5 border border-ink-200 rounded-2xl space-y-4 bg-linear-to-b from-white to-ink-50/30"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-black text-ink-400">
+                          {plan.planCode}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            plan.isPurchaseActive
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {plan.isPurchaseActive ? "ACTIVE FOR PURCHASE" : "LOCKED (APPROVAL PENDING)"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-base text-ink-900">{plan.name}</h4>
+                        <p className="text-xs text-ink-500 mt-1 leading-relaxed">
+                          {plan.description}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-ink-100">
+                        <div>
+                          <div className="text-ink-400 text-[10px] font-bold">Purchase Price</div>
+                          <div className="text-base font-black text-ink-900">₹{plan.priceRupees}</div>
+                        </div>
+                        <div>
+                          <div className="text-ink-400 text-[10px] font-bold">Product Wallet Credit</div>
+                          <div className="text-base font-black text-emerald-600">₹{plan.productWalletBenefitRupees}</div>
+                        </div>
+                        <div>
+                          <div className="text-ink-400 text-[10px] font-bold">Super Coupons</div>
+                          <div className="text-sm font-bold text-purple-700">
+                            {plan.superCouponCount}x {plan.superCouponType} (₹{plan.superCouponFaceValueRupees} each)
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-ink-400 text-[10px] font-bold">Validity</div>
+                          <div className="text-sm font-bold text-ink-700">365 Days</div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-between border-t border-ink-100 text-xs">
+                        <span className="text-[11px] text-ink-400">
+                          Changes are logged in audit ledger
+                        </span>
+                        <button
+                          onClick={() =>
+                            handleUpdatePromoPlan(plan.planCode, {
+                              isPurchaseActive: !plan.isPurchaseActive,
+                            })
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                            plan.isPurchaseActive
+                              ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700"
+                          }`}
+                        >
+                          {plan.isPurchaseActive ? "Deactivate Purchases" : "Activate Purchases"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Activation PINs Tab */}
+          {activeTab === "pins" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-ink-900 flex items-center space-x-1.5">
+                    <KeyRound className="w-4 h-4 text-brand-600" />
+                    <span>Activation PINs Ledger ({pinsList.length})</span>
+                  </h3>
+                </div>
+
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-ink-50 border-b border-ink-100 text-ink-500 font-bold uppercase">
+                    <tr>
+                      <th className="p-3">PIN Code</th>
+                      <th className="p-3">Tier</th>
+                      <th className="p-3">Face Value</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Current Owner</th>
+                      <th className="p-3">Purchaser</th>
+                      <th className="p-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink-100">
+                    {pinsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-ink-400">
+                          No activation PINs issued yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      pinsList.map((p) => (
+                        <tr key={p._id} className="hover:bg-ink-50/50">
+                          <td className="p-3 font-mono font-bold text-ink-900">{p.pinCode}</td>
+                          <td className="p-3 font-semibold text-brand-700">{p.tier}</td>
+                          <td className="p-3 font-bold text-ink-900">₹{(p.faceValuePaise / 100).toLocaleString("en-IN")}</td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                p.status === "ACTIVE"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : p.status === "REDEEMED"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-ink-700">
+                            {p.ownerMember?.name || "N/A"} ({p.ownerMember?.phone || "—"})
+                          </td>
+                          <td className="p-3 text-ink-500">
+                            {p.purchaserMember?.name || "N/A"}
+                          </td>
+                          <td className="p-3 text-ink-400 font-mono">
+                            {new Date(p.createdAt).toLocaleDateString("en-IN")}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* EMI Plans Tab */}
+          {activeTab === "emis" && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-ink-900 flex items-center space-x-1.5">
+                    <Calendar className="w-4 h-4 text-brand-600" />
+                    <span>EMI Schedules & Cancellation Review ({emisList.length})</span>
+                  </h3>
+                </div>
+
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-ink-50 border-b border-ink-100 text-ink-500 font-bold uppercase">
+                    <tr>
+                      <th className="p-3">EMI Ref</th>
+                      <th className="p-3">Order Ref</th>
+                      <th className="p-3">Member</th>
+                      <th className="p-3">Principal</th>
+                      <th className="p-3">Progress</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Cancellation Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink-100">
+                    {emisList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-ink-400">
+                          No EMI schedules generated yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      emisList.map((emi) => (
+                        <tr key={emi._id} className="hover:bg-ink-50/50">
+                          <td className="p-3 font-mono font-bold text-ink-900">{emi.emiRef}</td>
+                          <td className="p-3 font-mono text-ink-700">{emi.orderRef}</td>
+                          <td className="p-3 text-ink-800">
+                            {emi.member?.name || "N/A"} ({emi.member?.phone || "—"})
+                          </td>
+                          <td className="p-3 font-bold text-ink-900">
+                            ₹{(emi.totalPrincipalPaise / 100).toLocaleString("en-IN")}
+                          </td>
+                          <td className="p-3 text-ink-600">
+                            {emi.paidInstalmentsCount} of {emi.totalInstalments} Paid
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                emi.status === "ACTIVE"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : emi.status === "COMPLETED"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-rose-50 text-rose-700"
+                              }`}
+                            >
+                              {emi.status}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {emi.cancellationRequested ? (
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleApproveEmi(emi._id, "APPROVE")}
+                                  className="px-2 py-1 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-700"
+                                >
+                                  Approve Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleApproveEmi(emi._id, "REJECT")}
+                                  className="px-2 py-1 border border-ink-300 text-ink-700 rounded text-[10px] font-semibold hover:bg-ink-50"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-ink-400 text-[11px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Withdrawals Tab */}
+          {activeTab === "withdrawals" && (
+            <div className="space-y-6">
+              {/* Compliance Warning Banner */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-amber-900">
+                      Bank Payout & Withdrawal Governance
+                    </h4>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      Withdrawals debit member referral cash balances into hold
+                      immediately upon submission. Live automated bank
+                      disbursement (RazorpayX) remains disabled until commercial
+                      contract setup. Settlement confirmation requires banking
+                      UTR reference.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-amber-200 text-amber-900 rounded-full text-[10px] font-bold shrink-0">
+                  Manual Review Mode
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-ink-900 flex items-center space-x-1.5">
+                    <Coins className="w-4 h-4 text-brand-600" />
+                    <span>
+                      Member Bank Withdrawal Requests ({withdrawalsList.length})
+                    </span>
+                  </h3>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-ink-50 border-b border-ink-100 text-ink-500 font-bold uppercase">
+                      <tr>
+                        <th className="p-3">Ref</th>
+                        <th className="p-3">Member</th>
+                        <th className="p-3">Wallet</th>
+                        <th className="p-3">Amount</th>
+                        <th className="p-3">Bank Account</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Settlement / Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                      {withdrawalsList.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={7}
+                            className="p-8 text-center text-ink-400"
+                          >
+                            No withdrawal requests submitted yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        withdrawalsList.map((w) => (
+                          <tr key={w._id} className="hover:bg-ink-50/50">
+                            <td className="p-3 font-mono font-bold text-ink-900">
+                              {w.withdrawalRef}
+                            </td>
+                            <td className="p-3 text-ink-800">
+                              <div className="font-semibold">
+                                {w.member?.name || "N/A"}
+                              </div>
+                              <div className="text-[10px] text-ink-500 font-mono">
+                                {w.member?.phone || "—"} (
+                                {w.member?.memberId || "—"})
+                              </div>
+                            </td>
+                            <td className="p-3 font-mono text-[11px] text-ink-600">
+                              {w.walletType}
+                            </td>
+                            <td className="p-3 font-bold text-ink-900">
+                              ₹{(w.amountPaise / 100).toLocaleString("en-IN")}
+                            </td>
+                            <td className="p-3">
+                              <div className="text-ink-800 font-medium">
+                                {w.bankDetails?.bankName} &bull;{" "}
+                                {w.bankDetails?.accountHolderName}
+                              </div>
+                              <div className="text-[10px] text-ink-500 font-mono">
+                                A/C: {w.bankDetails?.accountNumber} &bull; IFSC:{" "}
+                                {w.bankDetails?.ifscCode}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  w.status === "REQUESTED"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : w.status === "APPROVED"
+                                    ? "bg-blue-50 text-blue-700"
+                                    : w.status === "PROCESSING"
+                                    ? "bg-purple-50 text-purple-700"
+                                    : w.status === "PAID"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-rose-50 text-rose-700"
+                                }`}
+                              >
+                                {w.status}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center space-x-1.5">
+                                {w.status === "REQUESTED" && (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        handleApproveWithdrawal(w._id)
+                                      }
+                                      className="px-2.5 py-1 bg-blue-600 text-white rounded text-[10px] font-bold hover:bg-blue-700"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleRejectWithdrawal(w._id)
+                                      }
+                                      className="px-2.5 py-1 border border-rose-300 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-semibold"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                                {w.status === "APPROVED" && (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        handleProcessWithdrawal(w._id)
+                                      }
+                                      className="px-2.5 py-1 bg-purple-600 text-white rounded text-[10px] font-bold hover:bg-purple-700"
+                                    >
+                                      Queue Payout
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleRejectWithdrawal(w._id)
+                                      }
+                                      className="px-2.5 py-1 border border-rose-300 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-semibold"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                                {w.status === "PROCESSING" && (
+                                  <button
+                                    onClick={() => handleConfirmPayout(w._id)}
+                                    className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-bold hover:bg-emerald-700"
+                                  >
+                                    Confirm Payout
+                                  </button>
+                                )}
+                                {w.status === "PAID" && (
+                                  <div className="text-[10px] font-mono text-emerald-700">
+                                    Ref: {w.providerPayoutRef || "MANUAL"}
+                                  </div>
+                                )}
+                                {w.status === "REJECTED" && (
+                                  <div
+                                    className="text-[10px] text-rose-600 truncate max-w-[120px]"
+                                    title={w.rejectionReason || ""}
+                                  >
+                                    {w.rejectionReason || "Rejected"}
                                   </div>
                                 )}
                               </div>

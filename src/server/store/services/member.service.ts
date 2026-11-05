@@ -4,6 +4,13 @@ import bcrypt from "bcryptjs";
 import { getStoreDb, withStoreTransaction } from "../db/connect";
 import { getStoreMemberModel, IStoreMemberDoc } from "../models/StoreMember";
 import { getOrCreateStoreWallet } from "./wallet-ledger.service";
+import {
+  getStoreCouponModel,
+  StoreCouponSource,
+  StoreCouponStatus,
+} from "../models/StoreCoupon";
+import { getStoreSettingsModel } from "../models/StoreSettings";
+import { generateStoreCouponCode } from "./store-coupon.service";
 import { DomainError } from "@/server/errors";
 
 export interface RegisterMemberInput {
@@ -99,7 +106,163 @@ export async function registerStoreMember(
     // 6. Automatically Initialize the 7-Wallet Cache
     await getOrCreateStoreWallet(newMember._id, session);
 
+    // 7. Automatic Free Registration Mini Coupon Issuance (Client Requirement B.1)
+    const CouponModel = getStoreCouponModel(conn);
+    const existingRegistrationCoupon = await CouponModel.findOne({
+      member: newMember._id,
+      source: StoreCouponSource.FREE_REGISTRATION,
+    }).session(session);
+
+    if (!existingRegistrationCoupon) {
+      // Check legal clearance for draw participation
+      const SettingsModel = getStoreSettingsModel(conn);
+      const settingsDoc = (await SettingsModel.findOne({
+        singletonKey: "DEFAULT_SETTINGS",
+      })
+        .session(session)
+        .lean()) as {
+        settings?: {
+          luckyDraw?: {
+            luckyDrawsEnabled?: boolean;
+            legalClearanceConfirmed?: boolean;
+          };
+          coupons?: {
+            freeRegistrationMiniCouponValuePaise?: number;
+            freeRegistrationCouponValidityDays?: number;
+          };
+        };
+      } | null;
+
+      const isDrawCleared =
+        settingsDoc?.settings?.luckyDraw?.luckyDrawsEnabled === true &&
+        settingsDoc?.settings?.luckyDraw?.legalClearanceConfirmed === true;
+
+      // Unique coupon code
+      let couponCode = generateStoreCouponCode();
+      while (await CouponModel.findOne({ couponCode }).session(session)) {
+        couponCode = generateStoreCouponCode();
+      }
+
+      // Configurable face value (default ₹50.00 pending written client confirmation)
+      const faceValuePaise =
+        settingsDoc?.settings?.coupons?.freeRegistrationMiniCouponValuePaise ?? 50_00;
+      const validityDays =
+        settingsDoc?.settings?.coupons?.freeRegistrationCouponValidityDays ?? 90;
+      const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+
+      await CouponModel.create(
+        [
+          {
+            couponCode,
+            member: newMember._id,
+            faceValuePaise,
+            couponType: "MINI",
+            source: StoreCouponSource.FREE_REGISTRATION,
+            sourceRef: `reg:${newMember.memberId}`,
+            status: StoreCouponStatus.ACTIVE,
+            expiresAt,
+            isEligibleForDraw: isDrawCleared, // STRICT LEGAL GATE: false unless legalClearanceConfirmed=true
+            metadata: {
+              registrationBonus: true,
+              issuedAt: new Date().toISOString(),
+              legalGateEnforced: !isDrawCleared,
+              faceValuePendingClientConfirmation: true,
+            },
+          },
+        ],
+        { session },
+      );
+
+      // Note: Free registration mini coupon is an unbacked discount voucher in StoreCoupon collection.
+      // It does NOT inflate the member's 7-wallet cache or create an unauthorized ledger balance.
+    }
+
     return newMember;
+  });
+}
+
+/**
+ * Idempotently issues a free registration mini coupon to an existing member if not already granted.
+ */
+export async function ensureFreeRegistrationCoupon(
+  memberId: string | Types.ObjectId,
+) {
+  return withStoreTransaction(async (session, conn) => {
+    const memberObjectId =
+      typeof memberId === "string" ? new Types.ObjectId(memberId) : memberId;
+    const MemberModel = getStoreMemberModel(conn);
+    const member = await MemberModel.findById(memberObjectId).session(session);
+    if (!member) {
+      throw new DomainError("Member not found.", 404, "MEMBER_NOT_FOUND");
+    }
+
+    const CouponModel = getStoreCouponModel(conn);
+    const existing = await CouponModel.findOne({
+      member: memberObjectId,
+      source: StoreCouponSource.FREE_REGISTRATION,
+    }).session(session);
+
+    if (existing) {
+      return { issued: false, isReplay: true, coupon: existing };
+    }
+
+    const SettingsModel = getStoreSettingsModel(conn);
+    const settingsDoc = (await SettingsModel.findOne({
+      singletonKey: "DEFAULT_SETTINGS",
+    })
+      .session(session)
+      .lean()) as {
+      settings?: {
+        luckyDraw?: {
+          luckyDrawsEnabled?: boolean;
+          legalClearanceConfirmed?: boolean;
+        };
+        coupons?: {
+          freeRegistrationMiniCouponValuePaise?: number;
+          freeRegistrationCouponValidityDays?: number;
+        };
+      };
+    } | null;
+
+    const isDrawCleared =
+      settingsDoc?.settings?.luckyDraw?.luckyDrawsEnabled === true &&
+      settingsDoc?.settings?.luckyDraw?.legalClearanceConfirmed === true;
+
+    let couponCode = generateStoreCouponCode();
+    while (await CouponModel.findOne({ couponCode }).session(session)) {
+      couponCode = generateStoreCouponCode();
+    }
+
+    const faceValuePaise =
+      settingsDoc?.settings?.coupons?.freeRegistrationMiniCouponValuePaise ?? 50_00;
+    const validityDays =
+      settingsDoc?.settings?.coupons?.freeRegistrationCouponValidityDays ?? 90;
+    const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+
+    const [coupon] = await CouponModel.create(
+      [
+        {
+          couponCode,
+          member: memberObjectId,
+          faceValuePaise,
+          couponType: "MINI",
+          source: StoreCouponSource.FREE_REGISTRATION,
+          sourceRef: `reg:${member.memberId}`,
+          status: StoreCouponStatus.ACTIVE,
+          expiresAt,
+          isEligibleForDraw: isDrawCleared,
+          metadata: {
+            registrationBonus: true,
+            issuedAt: new Date().toISOString(),
+            legalGateEnforced: !isDrawCleared,
+            faceValuePendingClientConfirmation: true,
+          },
+        },
+      ],
+      { session },
+    );
+
+    return { issued: true, isReplay: false, coupon };
   });
 }
 

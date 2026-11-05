@@ -23,6 +23,11 @@ export type OrderPaymentStatus =
   | "REFUNDED"
   | "FAILED";
 
+export type OrderPaymentMethod =
+  | "ONLINE_RAZORPAY"
+  | "COD"
+  | "ZERO_CASH_COUPONS";
+
 export interface IOrderItem {
   productId: Types.ObjectId;
   sku: string;
@@ -30,6 +35,7 @@ export interface IOrderItem {
   quantity: number;
   unitPricePaise: number;
   totalPricePaise: number;
+  taxPaise?: number;
 }
 
 export interface IShippingAddress {
@@ -65,11 +71,16 @@ export interface IStoreOrder {
   deficitPaise: number;
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
+  paymentMethod?: OrderPaymentMethod;
   compensationStatus?: OrderCompensationStatus;
   refundRequiredPaise?: number;
   refundedPaise?: number;
   refundedAt?: Date;
   refundId?: string;
+  codConfirmedAt?: Date;
+  codConfirmedBy?: Types.ObjectId;
+  invoiceNumber?: string | null;
+  invoiceIssuedAt?: Date | null;
   stockReservationExpiresAt: Date;
   paidAt?: Date;
   cancelledAt?: Date;
@@ -78,6 +89,7 @@ export interface IStoreOrder {
   createdAt: Date;
   updatedAt: Date;
 }
+
 
 export interface IStoreOrderDoc extends IStoreOrder, Document {}
 
@@ -124,6 +136,15 @@ const OrderItemSchema = new Schema<IOrderItem>(
       validate: {
         validator: Number.isInteger,
         message: "totalPricePaise must be an integer",
+      },
+    },
+    taxPaise: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: (v: number | null | undefined) => v == null || Number.isInteger(v),
+        message: "taxPaise must be an integer",
       },
     },
   },
@@ -294,6 +315,28 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
       required: true,
       index: true,
     },
+    paymentMethod: {
+      type: String,
+      enum: ["ONLINE_RAZORPAY", "COD", "ZERO_CASH_COUPONS"],
+      default: "ONLINE_RAZORPAY",
+      index: true,
+    },
+    codConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+    codConfirmedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    invoiceNumber: {
+      type: String,
+      trim: true,
+    },
+    invoiceIssuedAt: {
+      type: Date,
+    },
     stockReservationExpiresAt: {
       type: Date,
       required: true,
@@ -347,6 +390,13 @@ export const StoreOrderSchema = new Schema<IStoreOrderDoc>(
 );
 
 StoreOrderSchema.index({ memberId: 1, createdAt: -1 });
+StoreOrderSchema.index(
+  { invoiceNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { invoiceNumber: { $type: "string" } },
+  },
+);
 
 export function getStoreOrderModel(conn: Connection): Model<IStoreOrderDoc> {
   return (

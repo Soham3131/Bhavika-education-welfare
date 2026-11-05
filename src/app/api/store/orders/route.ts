@@ -26,6 +26,7 @@ const createOrderSchema = z.object({
     country: z.string().trim().default("India"),
   }),
   couponCodes: z.array(z.string().trim().min(1)).optional(),
+  paymentMethod: z.enum(["ONLINE_RAZORPAY", "COD"]).optional(),
   coupons: z
     .array(
       z.object({
@@ -56,16 +57,21 @@ export const POST = handle(async (req) => {
     items: parsed.items,
     shippingAddress: parsed.shippingAddress,
     couponCodes: rawCodes,
+    paymentMethod: parsed.paymentMethod,
   });
 
   return ok({
     success: true,
     orderRef: order.orderRef,
     itemsTotalRupees: order.itemsTotalPaise / 100,
+    taxRupees: order.taxPaise / 100,
+    shippingFeeRupees: order.shippingFeePaise / 100,
     couponDiscountRupees: order.couponDiscountPaise / 100,
     netPayableRupees: order.netPayablePaise / 100,
     netPayablePaise: order.netPayablePaise,
     status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
     stockReservationExpiresAt: order.stockReservationExpiresAt,
   });
 });
@@ -85,10 +91,13 @@ export const GET = handle(async () => {
         totalPriceRupees: it.totalPricePaise / 100,
       })),
       itemsTotalRupees: o.itemsTotalPaise / 100,
+      taxRupees: o.taxPaise / 100,
+      shippingFeeRupees: o.shippingFeePaise / 100,
       couponDiscountRupees: o.couponDiscountPaise / 100,
       netPayableRupees: o.netPayablePaise / 100,
       status: o.status,
       paymentStatus: o.paymentStatus,
+      paymentMethod: o.paymentMethod,
       deficitRupees: o.deficitPaise / 100,
       createdAt: o.createdAt,
     })),

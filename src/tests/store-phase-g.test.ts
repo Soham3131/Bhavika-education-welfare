@@ -307,14 +307,15 @@ describe("Phase G — Advanced Features: EMI, Winner-Stops-EMI, PINs & Jewellery
       // Making charges = 10% of 76,000 = 760,000 paise (₹7,600)
       expect(breakdown.makingChargesPaise).toBe(760000);
 
-      // GST: 3% on metal (₹2,280) + 5% on making (₹380) = ₹2,660 = 266,000 paise
+      // GST: 3% on metal (₹2,280) + 5% on making (₹380) + 3% on stone (₹15) = ₹2,675 = 267,500 paise
       expect(breakdown.metalGstPaise).toBe(228000);
       expect(breakdown.makingGstPaise).toBe(38000);
-      expect(breakdown.totalGstPaise).toBe(266000);
+      expect(breakdown.stoneGstPaise).toBe(1500);
+      expect(breakdown.totalGstPaise).toBe(267500);
 
-      // Total = 76,000 + 7,600 + 500 + 2,660 = ₹86,760 = 8,676,000 paise
-      expect(breakdown.totalPricePaise).toBe(8676000);
-      expect(breakdown.totalPriceRupees).toBe(86760);
+      // Total = 76,000 + 7,600 + 500 + 2,675 = ₹86,775 = 8,677,500 paise
+      expect(breakdown.totalPricePaise).toBe(8677500);
+      expect(breakdown.totalPriceRupees).toBe(86775);
 
       // 30-minute lock window
       expect(breakdown.priceLockedUntil.getTime()).toBeGreaterThan(Date.now());
@@ -341,8 +342,8 @@ describe("Phase G — Advanced Features: EMI, Winner-Stops-EMI, PINs & Jewellery
         note: "Birthday gift coupon",
       });
 
-      // Sender's coupon is now REDEEMED (cannot be used again)
-      expect(transferRes.transferredCoupon.status).toBe(StoreCouponStatus.REDEEMED);
+      // Sender's coupon is now TRANSFERRED (cannot be used again)
+      expect(transferRes.transferredCoupon.status).toBe(StoreCouponStatus.TRANSFERRED);
 
       // Recipient gets newly minted active coupon with same face value
       expect(transferRes.newCoupon.status).toBe(StoreCouponStatus.ACTIVE);

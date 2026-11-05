@@ -1,6 +1,8 @@
 import { Types } from "mongoose";
 import { getStoreDb } from "../db/connect";
 import { getStoreProductModel } from "../models/StoreProduct";
+import { getStoreCategoryModel } from "../models/StoreCategory";
+import { calculateJewelleryPrice } from "./jewellery-pricing.service";
 import { DomainError } from "@/server/errors";
 
 export interface CartInputItem {
@@ -15,6 +17,8 @@ export interface CalculatedCartLineItem {
   quantity: number;
   unitPricePaise: number;
   totalPricePaise: number;
+  taxPaise?: number;
+  isJewellery?: boolean;
 }
 
 export interface CalculateCartOptions {
@@ -61,9 +65,11 @@ export async function calculateCart(
 
   const db = await getStoreDb();
   const Product = getStoreProductModel(db);
+  const Category = getStoreCategoryModel(db);
 
   const calculatedItems: CalculatedCartLineItem[] = [];
   let itemsTotalPaise = 0;
+  let totalTaxPaise = 0;
 
   for (const item of items) {
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
@@ -86,8 +92,71 @@ export async function calculateCart(
       );
     }
 
-    const unitPricePaise = product.basePricePaise;
+    // Determine if product is dynamic jewellery
+    let unitPricePaise = product.basePricePaise;
+    let itemTaxPaise = 0;
+    let isJewellery = false;
+
+    const category = product.category
+      ? await Category.findById(product.category)
+      : null;
+
+    const catType = category?.type;
+    const isJewelleryCategory =
+      catType === "JEWELLERY_GOLD" || catType === "JEWELLERY_SILVER";
+    const metalAttr = product.attributes?.metalType as string | undefined;
+
+    if (isJewelleryCategory || metalAttr === "GOLD" || metalAttr === "SILVER") {
+      isJewellery = true;
+      const grossWeight =
+        typeof product.attributes?.grossWeightGrams === "number"
+          ? product.attributes.grossWeightGrams
+          : typeof product.attributes?.weightGrams === "number"
+          ? product.attributes.weightGrams
+          : null;
+
+      if (grossWeight && grossWeight > 0) {
+        const metalType: "GOLD" | "SILVER" =
+          metalAttr === "SILVER" || catType === "JEWELLERY_SILVER"
+            ? "SILVER"
+            : "GOLD";
+
+        const stoneWeight =
+          typeof product.attributes?.stoneWeightGrams === "number"
+            ? product.attributes.stoneWeightGrams
+            : 0;
+
+        const stoneChargePaise =
+          typeof product.attributes?.stoneChargePaise === "number"
+            ? product.attributes.stoneChargePaise
+            : 0;
+
+        const makingChargeType =
+          product.attributes?.makingChargeType === "PERCENTAGE"
+            ? ("PERCENTAGE" as const)
+            : ("PER_GRAM" as const);
+
+        const makingChargeValue =
+          typeof product.attributes?.makingChargeValue === "number"
+            ? product.attributes.makingChargeValue
+            : undefined;
+
+        const quote = await calculateJewelleryPrice({
+          metalType,
+          grossWeightGrams: grossWeight,
+          stoneWeightGrams: stoneWeight,
+          stoneChargePaise,
+          makingChargeType,
+          makingChargeValue,
+        });
+
+        unitPricePaise = quote.subtotalBeforeGstPaise;
+        itemTaxPaise = quote.totalGstPaise;
+      }
+    }
+
     const totalPricePaise = unitPricePaise * item.quantity;
+    const lineTaxPaise = itemTaxPaise * item.quantity;
 
     calculatedItems.push({
       productId: product._id as Types.ObjectId,
@@ -96,12 +165,15 @@ export async function calculateCart(
       quantity: item.quantity,
       unitPricePaise,
       totalPricePaise,
+      taxPaise: lineTaxPaise,
+      isJewellery,
     });
 
     itemsTotalPaise += totalPricePaise;
+    totalTaxPaise += lineTaxPaise;
   }
 
-  const taxPaise = 0; // Prices are tax-inclusive by default in Phase B
+  const taxPaise = totalTaxPaise;
 
   // Free shipping policy applies to merchandise subtotal before coupons
   const qualifiesForFreeShipping = itemsTotalPaise >= FREE_SHIPPING_THRESHOLD_PAISE;
@@ -111,6 +183,7 @@ export async function calculateCart(
       : qualifiesForFreeShipping
       ? 0
       : STANDARD_SHIPPING_FEE_PAISE;
+
 
   // Strict coupon discount authority:
   // Reject over-coverage to prevent silent loss of unspent customer coupon value.

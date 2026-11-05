@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/lib/store/cart-context";
+import { BhavikaNgoBanner } from "@/components/store/BhavikaNgoBanner";
 import {
   ArrowRight,
   ShoppingCart,
@@ -377,6 +378,11 @@ export default function StoreHomePage() {
           </div>
         </div>
       </section>
+
+      {/* =========================================================================
+          BHAVIKA NGO REGISTRATION BANNER (Community Support & Foundation Initiatives)
+         ========================================================================= */}
+      <BhavikaNgoBanner />
 
       {/* =========================================================================
           SECTION G: TRENDING PRODUCTS (Consistent Product Cards with Floral Divider)

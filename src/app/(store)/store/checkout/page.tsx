@@ -17,6 +17,19 @@ interface AppliedCoupon {
   code: string;
 }
 
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if ((window as unknown as { Razorpay?: unknown }).Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCart();
@@ -60,8 +73,11 @@ export default function CheckoutPage() {
       .catch(() => router.push("/store/login?redirect=/store/checkout"));
   }, [router]);
 
+  const [paymentMethod, setPaymentMethod] = useState<"ONLINE_RAZORPAY" | "COD">("ONLINE_RAZORPAY");
+
   interface ServerQuote {
     itemsTotalRupees: number;
+    taxRupees?: number;
     shippingFeeRupees: number;
     couponDiscountRupees: number;
     totalPayableRupees: number;
@@ -104,6 +120,7 @@ export default function CheckoutPage() {
         if (isMounted) {
           setServerQuote({
             itemsTotalRupees: data.itemsTotalRupees,
+            taxRupees: data.taxRupees,
             shippingFeeRupees: data.shippingFeeRupees,
             couponDiscountRupees: data.couponDiscountRupees,
             totalPayableRupees: data.totalPayableRupees,
@@ -191,6 +208,7 @@ export default function CheckoutPage() {
           })),
           shippingAddress: address,
           couponCodes: appliedCoupons.map((c) => c.code),
+          paymentMethod,
         }),
       });
 
@@ -201,14 +219,14 @@ export default function CheckoutPage() {
 
       const orderRef = orderData.orderRef;
 
-      // 2. If net payable is 0 (100% coupon covered), complete checkout directly
-      if (orderData.netPayablePaise === 0) {
+      // 2. If Cash on Delivery or zero cash payable (100% coupon covered), complete checkout directly
+      if (orderData.paymentMethod === "COD" || orderData.netPayablePaise === 0) {
         clearCart();
         router.push(`/store/orders/${orderRef}`);
         return;
       }
 
-      // 3. Initiate payment attempt
+      // 3. Initiate payment attempt for online payment
       const paymentRes = await fetch("/api/store/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -220,7 +238,78 @@ export default function CheckoutPage() {
         throw new Error(paymentData.error || "Failed to initiate payment.");
       }
 
-      // 4. Complete verification call
+      // 4. If Razorpay order ID is provided and browser is available, open authentic Razorpay modal
+      const isBrowser = typeof window !== "undefined";
+      const hasRazorpayOrder = Boolean(paymentData.razorpayOrderId);
+
+      if (isBrowser && hasRazorpayOrder) {
+        const loaded = await loadRazorpayScript();
+        if (loaded && (window as unknown as { Razorpay?: unknown }).Razorpay) {
+          type RazorpayInstance = {
+            open: () => void;
+          };
+          type RazorpayCtor = new (options: Record<string, unknown>) => RazorpayInstance;
+          const Razorpay = (window as unknown as { Razorpay: RazorpayCtor }).Razorpay;
+
+          const rzp = new Razorpay({
+            key: paymentData.razorpayKeyId,
+            amount: paymentData.amountPaise,
+            currency: paymentData.currency || "INR",
+            name: "Jai Maa Durga Store",
+            description: `Order ${orderRef}`,
+            order_id: paymentData.razorpayOrderId,
+            prefill: {
+              name: address.fullName,
+              contact: address.phone,
+            },
+            theme: { color: "#6B0B1A" },
+            modal: {
+              ondismiss: () => {
+                setSubmitting(false);
+              },
+            },
+            handler: async (resp: {
+              razorpay_payment_id: string;
+              razorpay_order_id: string;
+              razorpay_signature: string;
+            }) => {
+              try {
+                const verifyRes = await fetch("/api/store/payments/verify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    paymentAttemptId: paymentData.paymentAttemptId,
+                    orderRef,
+                    razorpayPaymentId: resp.razorpay_payment_id,
+                    razorpayOrderId: resp.razorpay_order_id,
+                    razorpaySignature: resp.razorpay_signature,
+                  }),
+                });
+
+                const verifyData = await verifyRes.json();
+                if (!verifyRes.ok) {
+                  throw new Error(verifyData.error || "Payment verification failed.");
+                }
+
+                clearCart();
+                router.push(`/store/orders/${orderRef}`);
+              } catch (verifyErr) {
+                setErrorMessage(
+                  verifyErr instanceof Error
+                    ? verifyErr.message
+                    : "Payment verification failed.",
+                );
+                setSubmitting(false);
+              }
+            },
+          });
+
+          rzp.open();
+          return;
+        }
+      }
+
+      // Development / test fallback verification (when running without live browser modal)
       const verifyRes = await fetch("/api/store/payments/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -228,6 +317,7 @@ export default function CheckoutPage() {
           paymentAttemptId: paymentData.paymentAttemptId,
           orderRef,
           razorpayPaymentId: `pay_test_${Date.now()}`,
+          razorpayOrderId: paymentData.razorpayOrderId,
         }),
       });
 
@@ -501,6 +591,75 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Payment Method Selection */}
+          <div className="bg-white p-6 rounded-xl border border-[#EBDCB9] shadow-2xs space-y-4">
+            <h2 className="font-serif text-base font-bold text-[#6B0B1A] border-b border-[#EBDCB9]/60 pb-2.5">
+              3. Payment Method
+            </h2>
+
+            <div className="space-y-3">
+              <label
+                className={`flex items-start space-x-3 p-3.5 rounded-lg border cursor-pointer transition ${
+                  paymentMethod === "ONLINE_RAZORPAY"
+                    ? "border-[#6B0B1A] bg-[#FAF7F2]"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="ONLINE_RAZORPAY"
+                  checked={paymentMethod === "ONLINE_RAZORPAY"}
+                  onChange={() => setPaymentMethod("ONLINE_RAZORPAY")}
+                  className="mt-0.5 text-[#6B0B1A] focus:ring-[#6B0B1A]"
+                />
+                <div className="text-xs">
+                  <div className="font-semibold text-gray-900 flex items-center space-x-2">
+                    <span>Online Payment (Razorpay)</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="text-gray-500 mt-0.5">
+                    Pay securely using UPI, Debit/Credit Cards, Netbanking, or Wallets via 256-bit encrypted Razorpay.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start space-x-3 p-3.5 rounded-lg border cursor-pointer transition ${
+                  paymentMethod === "COD"
+                    ? "border-[#6B0B1A] bg-[#FAF7F2]"
+                    : "border-gray-200 hover:border-gray-300"
+                } ${
+                  netPayableRupees > 5000
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="COD"
+                  checked={paymentMethod === "COD"}
+                  disabled={netPayableRupees > 5000}
+                  onChange={() => setPaymentMethod("COD")}
+                  className="mt-0.5 text-[#6B0B1A] focus:ring-[#6B0B1A]"
+                />
+                <div className="text-xs">
+                  <div className="font-semibold text-gray-900">
+                    Cash on Delivery (COD)
+                  </div>
+                  <p className="text-gray-500 mt-0.5">
+                    {netPayableRupees > 5000
+                      ? "Cash on delivery is available for orders up to ₹5,000 only."
+                      : "Pay cash at your doorstep upon delivery."}
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
         </div>

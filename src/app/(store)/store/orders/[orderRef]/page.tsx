@@ -11,6 +11,7 @@ import {
   Truck,
   MapPin,
   Ticket,
+  FileText,
 } from "lucide-react";
 
 interface OrderDetail {
@@ -154,7 +155,16 @@ export default function OrderTrackingPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`/api/store/orders/${order.orderRef}/invoice`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-xs"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Download Tax Invoice (PDF)</span>
+            </a>
             {order.status === "PAID" && (
               <span className="inline-flex items-center space-x-1 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">
                 <CheckCircle className="w-3.5 h-3.5" />
@@ -242,9 +252,22 @@ export default function OrderTrackingPage() {
             </div>
           )}
 
+          {order.taxRupees > 0 && (
+            <div className="flex justify-between text-slate-600">
+              <span>GST & Applicable Taxes</span>
+              <span className="font-semibold text-slate-900">
+                ₹{order.taxRupees.toLocaleString("en-IN")}
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between text-slate-600">
-            <span>Delivery & Taxes</span>
-            <span className="font-semibold text-emerald-600">Free</span>
+            <span>Shipping & Handling</span>
+            <span className="font-semibold text-emerald-600">
+              {order.shippingFeeRupees > 0
+                ? `₹${order.shippingFeeRupees.toLocaleString("en-IN")}`
+                : "Free"}
+            </span>
           </div>
 
           <div className="border-t border-slate-200 pt-3 flex justify-between text-sm font-black text-slate-900">

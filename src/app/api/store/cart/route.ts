@@ -61,6 +61,8 @@ export const POST = handle(async (req) => {
     })),
     itemsTotalPaise: cart.itemsTotalPaise,
     itemsTotalRupees: cart.itemsTotalPaise / 100,
+    taxPaise: cart.taxPaise,
+    taxRupees: cart.taxPaise / 100,
     shippingFeePaise: cart.shippingFeePaise,
     shippingFeeRupees: cart.shippingFeePaise / 100,
     couponDiscountPaise: cart.couponDiscountPaise,

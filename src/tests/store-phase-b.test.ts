@@ -48,6 +48,7 @@ import {
 } from "@/server/store/models/StoreCoupon";
 import { getStoreWalletModel } from "@/server/store/models/StoreWallet";
 import { getStoreWalletLedgerModel } from "@/server/store/models/StoreWalletLedger";
+import { getStoreOrderModel } from "@/server/store/models/StoreOrder";
 import { verifyStoreAdminCapability } from "@/server/store/auth/store-admin";
 import { AdminAuditLog } from "@/server/models";
 
@@ -56,6 +57,18 @@ describe("Phase B — Commerce Core", () => {
   let categoryId: string;
 
   beforeAll(async () => {
+    // Ensure test database index supports partial unique invoiceNumber without null collisions
+    const db = await getStoreDb();
+    const OrderModel = getStoreOrderModel(db);
+    try {
+      const existingIndexes = await db.collection("store_orders").indexes();
+      const oldInvIdx = existingIndexes.find((i) => i.name === "invoiceNumber_1");
+      if (oldInvIdx && !oldInvIdx.partialFilterExpression) {
+        await db.collection("store_orders").dropIndex("invoiceNumber_1");
+      }
+    } catch {}
+    await OrderModel.createIndexes();
+
     // Register a test store member for orders
     const member = await registerStoreMember({
       name: "Commerce Test Member",

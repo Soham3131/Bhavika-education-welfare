@@ -9,10 +9,13 @@ export const StoreCouponSource = {
   EMI_INSTALMENT: "EMI_INSTALMENT",
   ADMIN_GRANT: "ADMIN_GRANT",
   REFERRAL_REWARD: "REFERRAL_REWARD",
+  MEMBERSHIP_PLAN: "MEMBERSHIP_PLAN",
 } as const;
 
 export type StoreCouponSource =
   (typeof StoreCouponSource)[keyof typeof StoreCouponSource];
+
+export type StoreCouponType = "STANDARD" | "SUPER" | "MINI";
 
 export const StoreCouponStatus = {
   ACTIVE: "ACTIVE",
@@ -30,6 +33,7 @@ export interface IStoreCoupon {
   couponCode: string;
   member: Types.ObjectId;
   faceValuePaise: number;
+  couponType?: StoreCouponType;
   source: StoreCouponSource;
   sourceRef?: string | null;
   status: StoreCouponStatus;
@@ -68,6 +72,12 @@ export const StoreCouponSchema = new Schema<IStoreCouponDoc>(
       type: Number,
       required: true,
       min: 1,
+    },
+    couponType: {
+      type: String,
+      enum: ["STANDARD", "SUPER", "MINI"],
+      default: "STANDARD",
+      index: true,
     },
     source: {
       type: String,
@@ -140,6 +150,16 @@ StoreCouponSchema.index({ member: 1, status: 1 });
 StoreCouponSchema.index({ status: 1, expiresAt: 1 });
 StoreCouponSchema.index({ source: 1, sourceRef: 1 });
 StoreCouponSchema.index({ lockedOrderRef: 1, status: 1 });
+
+// Atomic engine-level constraint: exactly one FREE_REGISTRATION coupon per member
+StoreCouponSchema.index(
+  { member: 1, source: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { source: StoreCouponSource.FREE_REGISTRATION },
+    name: "unique_free_reg_coupon_per_member",
+  },
+);
 
 export function getStoreCouponModel(
   conn: Connection,

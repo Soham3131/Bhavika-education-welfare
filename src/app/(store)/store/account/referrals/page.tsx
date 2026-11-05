@@ -69,7 +69,13 @@ export default function MemberReferralsPage() {
             Grow your direct network and track immediate downline sales performance
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/store/account/withdrawals"
+            className="px-3 py-1.5 bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 rounded-lg text-xs font-semibold flex items-center gap-1"
+          >
+            <span>Bank Withdrawals</span>
+          </Link>
           <Link
             href="/store/account/coupons"
             className="px-3 py-1.5 border border-ink-200 text-ink-700 hover:bg-ink-50 rounded-lg text-xs font-semibold"

@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx scripts/seed.ts",
-    "seed:store": "tsx scripts/seed-store.ts"
+    "seed:store": "tsx scripts/seed-store.ts",
+    "verify:atlas": "tsx scripts/verify-atlas-jmd.ts"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",

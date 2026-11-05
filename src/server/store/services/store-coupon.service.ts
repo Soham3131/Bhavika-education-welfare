@@ -7,6 +7,7 @@ import {
   IStoreCouponDoc,
   StoreCouponSource,
   StoreCouponStatus,
+  StoreCouponType,
 } from "../models/StoreCoupon";
 import { getStoreWalletModel } from "../models/StoreWallet";
 import { DomainError } from "@/server/errors";
@@ -14,6 +15,7 @@ import { DomainError } from "@/server/errors";
 export interface IssueStoreCouponInput {
   memberId: string | Types.ObjectId;
   faceValuePaise: number;
+  couponType?: StoreCouponType;
   source: StoreCouponSource;
   sourceRef?: string | null;
   validityDays?: number;
@@ -64,6 +66,17 @@ export async function issueStoreCoupon(
     const CouponModel = getStoreCouponModel(conn);
     const WalletModel = getStoreWalletModel(conn);
 
+    // Free registration mini coupons are strictly single-issue per member
+    if (input.source === StoreCouponSource.FREE_REGISTRATION) {
+      const existing = await CouponModel.findOne({
+        member: memberObjectId,
+        source: StoreCouponSource.FREE_REGISTRATION,
+      }).session(session);
+      if (existing) {
+        return existing;
+      }
+    }
+
     let couponCode = generateStoreCouponCode();
     // Guarantee uniqueness
     while (await CouponModel.findOne({ couponCode }).session(session)) {
@@ -76,6 +89,7 @@ export async function issueStoreCoupon(
           couponCode,
           member: memberObjectId,
           faceValuePaise: input.faceValuePaise,
+          couponType: input.couponType ?? "STANDARD",
           source: input.source,
           sourceRef: input.sourceRef ?? null,
           status: StoreCouponStatus.ACTIVE,
@@ -87,23 +101,25 @@ export async function issueStoreCoupon(
       { session },
     );
 
-    // Atomically increment the derived coupon valuation cache on the member's wallet
-    await WalletModel.findOneAndUpdate(
-      { member: memberObjectId },
-      {
-        $inc: { couponWalletPaise: input.faceValuePaise },
-        $setOnInsert: {
-          member: memberObjectId,
-          addMoneyPaise: 0,
-          memberActivationPaise: 0,
-          productPoints: 0,
-          freeReferralPaise: 0,
-          paidReferralPaise: 0,
-          rechargePaise: 0,
+    // Atomically increment the derived coupon valuation cache on the member's wallet (for wallet-backed coupons only)
+    if (input.source !== StoreCouponSource.FREE_REGISTRATION) {
+      await WalletModel.findOneAndUpdate(
+        { member: memberObjectId },
+        {
+          $inc: { couponWalletPaise: input.faceValuePaise },
+          $setOnInsert: {
+            member: memberObjectId,
+            addMoneyPaise: 0,
+            memberActivationPaise: 0,
+            productPoints: 0,
+            freeReferralPaise: 0,
+            paidReferralPaise: 0,
+            rechargePaise: 0,
+          },
         },
-      },
-      { upsert: true, session },
-    );
+        { upsert: true, session },
+      );
+    }
 
     return coupon;
   });
@@ -212,12 +228,14 @@ export async function redeemStoreCoupon(
     coupon.redeemedOrderRef = input.orderRef;
     await coupon.save({ session });
 
-    // Decrement couponWalletPaise cache
-    await WalletModel.updateOne(
-      { member: memberObjectId },
-      { $inc: { couponWalletPaise: -coupon.faceValuePaise } },
-      { session },
-    );
+    // Decrement couponWalletPaise cache (for wallet-backed coupons only)
+    if (coupon.source !== StoreCouponSource.FREE_REGISTRATION) {
+      await WalletModel.updateOne(
+        { member: memberObjectId },
+        { $inc: { couponWalletPaise: -coupon.faceValuePaise } },
+        { session },
+      );
+    }
 
     return {
       redeemed: true,
@@ -268,12 +286,14 @@ export async function restoreStoreCoupon(input: {
     };
     await coupon.save({ session });
 
-    // Re-credit to wallet valuation cache
-    await WalletModel.updateOne(
-      { member: memberObjectId },
-      { $inc: { couponWalletPaise: coupon.faceValuePaise } },
-      { session },
-    );
+    // Re-credit to wallet valuation cache (for wallet-backed coupons only)
+    if (coupon.source !== StoreCouponSource.FREE_REGISTRATION) {
+      await WalletModel.updateOne(
+        { member: memberObjectId },
+        { $inc: { couponWalletPaise: coupon.faceValuePaise } },
+        { session },
+      );
+    }
 
     return coupon;
   });

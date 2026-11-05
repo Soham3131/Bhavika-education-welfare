@@ -26,7 +26,11 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   return DEFAULT_STORE_SETTINGS;
 }
 
-export async function updateStoreSettings(updates: Partial<StoreSettings>): Promise<StoreSettings> {
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+export async function updateStoreSettings(updates: DeepPartial<StoreSettings>): Promise<StoreSettings> {
   const current = await getStoreSettings();
   const merged = {
     ...current,
@@ -43,6 +47,10 @@ export async function updateStoreSettings(updates: Partial<StoreSettings>): Prom
       ...current.jewellery,
       ...(updates.jewellery || {}),
     },
+    cod: {
+      ...current.cod,
+      ...(updates.cod || {}),
+    },
     inventory: {
       ...current.inventory,
       ...(updates.inventory || {}),
@@ -54,6 +62,14 @@ export async function updateStoreSettings(updates: Partial<StoreSettings>): Prom
     recharge: {
       ...current.recharge,
       ...(updates.recharge || {}),
+    },
+    coupons: {
+      ...current.coupons,
+      ...(updates.coupons || {}),
+    },
+    invoice: {
+      ...current.invoice,
+      ...(updates.invoice || {}),
     },
   };
 

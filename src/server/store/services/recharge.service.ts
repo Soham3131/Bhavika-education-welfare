@@ -92,6 +92,15 @@ export async function submitRechargeOrder(
     throw new DomainError("Member not found.", 404, "MEMBER_NOT_FOUND");
   }
 
+  const configStatus = getRechargeProviderConfigStatus();
+  if (process.env.NODE_ENV === "production" && !configStatus.canExecuteLive) {
+    throw new DomainError(
+      "Recharge services are currently offline: production telecom aggregator credentials and merchant wallet funding have not been configured.",
+      503,
+      "RECHARGE_PROVIDER_NOT_CONFIGURED",
+    );
+  }
+
   const rechargeRef = generateRechargeRef();
   const provider = getRechargeProvider();
 
@@ -402,4 +411,148 @@ export async function listAllRecharges(query: {
   ]);
 
   return { recharges, total };
+}
+
+/**
+ * Returns configuration readiness status of telecom recharge services.
+ */
+export function getRechargeProviderConfigStatus(): {
+  isConfigured: boolean;
+  providerName: string;
+  isMock: boolean;
+  canExecuteLive: boolean;
+  message: string;
+} {
+  const isProd = process.env.NODE_ENV === "production";
+  const hasCredentials = !!(
+    process.env.TELECOM_AGGREGATOR_API_KEY &&
+    process.env.TELECOM_AGGREGATOR_SECRET
+  );
+
+  if (isProd && !hasCredentials) {
+    return {
+      isConfigured: false,
+      providerName: "NONE",
+      isMock: false,
+      canExecuteLive: false,
+      message:
+        "Production telecom aggregator credentials are not configured. Live recharge processing is offline.",
+    };
+  }
+
+  return {
+    isConfigured: true,
+    providerName: hasCredentials ? "PRODUCTION_AGGREGATOR" : "MOCK_PROVIDER",
+    isMock: !hasCredentials,
+    canExecuteLive: hasCredentials,
+    message: hasCredentials
+      ? "Production telecom aggregator active and configured."
+      : "Staging/Development mock provider active. Prohibited in production.",
+  };
+}
+
+/**
+ * Handles asynchronous status webhook callbacks from telecom providers with strict duplicate protection.
+ */
+export async function handleRechargeWebhookCallback(input: {
+  providerRef: string;
+  status: "SUCCESS" | "FAILED";
+  failureReason?: string;
+  providerPayoutPaise?: number;
+}): Promise<{
+  processed: boolean;
+  isDuplicate: boolean;
+  order: IStoreRechargeOrderDoc | null;
+  message: string;
+}> {
+  const db = await getStoreDb();
+  const RechargeOrderModel = getStoreRechargeOrderModel(db);
+  const MemberModel = getStoreMemberModel(db);
+
+  const order = await RechargeOrderModel.findOne({
+    providerRef: input.providerRef,
+  });
+  if (!order) {
+    return {
+      processed: false,
+      isDuplicate: false,
+      order: null,
+      message: "Recharge order not found for provider reference.",
+    };
+  }
+
+  // Duplicate callback idempotency check
+  if (
+    order.status === RechargeStatus.SUCCESS ||
+    order.status === RechargeStatus.FAILED
+  ) {
+    return {
+      processed: false,
+      isDuplicate: true,
+      order,
+      message: `Callback ignored: order already finalized with status '${order.status}'.`,
+    };
+  }
+
+  if (input.status === "SUCCESS") {
+    const member = await MemberModel.findById(order.member);
+    const payout = input.providerPayoutPaise ?? order.providerPayoutPaise;
+    const commission = calculateRechargeCommission(
+      member?.tier || "FREE",
+      payout,
+    );
+
+    order.status = RechargeStatus.SUCCESS;
+    order.memberCommissionPaise = commission;
+    order.commissionStatus = RechargeCommissionStatus.CREDITED;
+    order.reconciledAt = new Date();
+    await order.save();
+
+    if (commission > 0) {
+      await mutateStoreWallet({
+        memberId: order.member,
+        walletType: "RECHARGE",
+        type: "CREDIT",
+        unit: "INR_PAISE",
+        amountPaise: commission,
+        referenceType: "REFERRAL_COMMISSION",
+        referenceId: order.rechargeRef,
+        idempotencyKey: `rch-comm-cb:${order.rechargeRef}`,
+        description: `Webhook confirmed commission for ${order.serviceType} recharge`,
+      });
+    }
+
+    return {
+      processed: true,
+      isDuplicate: false,
+      order,
+      message: "Order successfully marked SUCCESS and commission credited.",
+    };
+  } else {
+    order.status = RechargeStatus.FAILED;
+    order.failureReason =
+      input.failureReason || "Provider callback reported failure.";
+    order.reconciledAt = new Date();
+    await order.save();
+
+    // Refund principal amount to member
+    await mutateStoreWallet({
+      memberId: order.member,
+      walletType: "ADD_MONEY",
+      type: "CREDIT",
+      unit: "INR_PAISE",
+      amountPaise: order.amountPaise,
+      referenceType: "RECHARGE_REVERSAL",
+      referenceId: order.rechargeRef,
+      idempotencyKey: `rch-refund-cb:${order.rechargeRef}`,
+      description: `Refund for failed ${order.serviceType} recharge (via provider callback)`,
+    });
+
+    return {
+      processed: true,
+      isDuplicate: false,
+      order,
+      message: "Order marked FAILED and principal amount refunded to member.",
+    };
+  }
 }
