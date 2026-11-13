@@ -23,11 +23,10 @@ const notoDevanagari = Noto_Sans_Devanagari({
   display: "swap",
 });
 
-// Editorial serif typeface for Jai Maa Durga luxury headings.
+// Editorial serif typeface for Jai Maa Durga luxury headings (variable font 400-900).
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
   display: "swap",
 });
 
