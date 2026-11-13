@@ -5,6 +5,7 @@ import {
   reconcilePendingRecharges,
   reverseRechargeOrder,
 } from "@/server/store/services/recharge.service";
+import { getRechargeProvider } from "@/server/store/services/recharge-provider";
 import {
   RechargeServiceType,
   RechargeStatus,
@@ -17,6 +18,9 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("RECONCILE"),
   }),
   z.object({
+    action: z.literal("CHECK_BALANCE"),
+  }),
+  z.object({
     action: z.literal("REVERSE"),
     rechargeRef: z.string().min(1, "rechargeRef required"),
     reason: z.string().min(3, "Audit reason required"),
@@ -27,6 +31,22 @@ export const GET = handle(async (req) => {
   await requireStoreAdmin("STORE_FINANCIAL_RECONCILE");
 
   const url = new URL(req.url);
+  const action = url.searchParams.get("action")?.toUpperCase();
+
+  if (action === "BALANCE") {
+    const provider = getRechargeProvider();
+    if (provider.checkBalance) {
+      const balanceData = await provider.checkBalance();
+      return ok({
+        providerName: provider.name,
+        balanceRupees: balanceData.balanceRupees,
+        currency: balanceData.currency,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    return fail("Balance inquiry not supported by active provider", 400);
+  }
+
   const status = url.searchParams.get("status") as RechargeStatus | null;
   const serviceType = url.searchParams.get("serviceType") as RechargeServiceType | null;
   const limit = Number(url.searchParams.get("limit") || 50);
@@ -46,6 +66,20 @@ export const POST = handle(async (req) => {
   const admin = await requireStoreAdmin("STORE_FINANCIAL_RECONCILE");
   const body = await req.json();
   const parsed = actionSchema.parse(body);
+
+  if (parsed.action === "CHECK_BALANCE") {
+    const provider = getRechargeProvider();
+    if (provider.checkBalance) {
+      const balanceData = await provider.checkBalance();
+      return ok({
+        providerName: provider.name,
+        balanceRupees: balanceData.balanceRupees,
+        currency: balanceData.currency,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    return fail("Balance inquiry not supported by active provider", 400);
+  }
 
   if (parsed.action === "RECONCILE") {
     const outcome = await reconcilePendingRecharges();

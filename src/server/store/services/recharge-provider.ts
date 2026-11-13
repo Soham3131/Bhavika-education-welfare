@@ -1,5 +1,6 @@
 import "server-only";
 import { RechargeServiceType } from "../models/StoreRechargeOrder";
+import { A1TopupProvider } from "./a1topup-provider";
 
 export interface Operator {
   id: string;
@@ -24,20 +25,26 @@ export interface RechargeRequest {
   consumerNumber: string;
   circle?: string | null;
   amountPaise: number;
+  value1?: string | null;
+  value2?: string | null;
 }
 
 export interface RechargeSubmissionResult {
   status: "SUCCESS" | "PENDING" | "FAILED";
   providerRef: string;
+  operatorRef?: string;
   providerPayoutPaise: number;
   failureReason?: string;
+  rawResponse?: Record<string, unknown>;
 }
 
 export interface RechargeStatusResult {
   status: "SUCCESS" | "PENDING" | "FAILED" | "REVERSED";
   providerRef: string;
+  operatorRef?: string;
   providerPayoutPaise: number;
   failureReason?: string;
+  rawResponse?: Record<string, unknown>;
 }
 
 export interface RechargeProvider {
@@ -46,6 +53,7 @@ export interface RechargeProvider {
   fetchPlans(operator: string, circle?: string): Promise<RechargePlan[]>;
   submitRecharge(request: RechargeRequest): Promise<RechargeSubmissionResult>;
   checkStatus(providerRef: string): Promise<RechargeStatusResult>;
+  checkBalance?(): Promise<{ balanceRupees: number; currency: string; raw?: unknown }>;
 }
 
 // In-memory mock database of provider references for asynchronous reconciliation testing
@@ -116,6 +124,17 @@ export class MockRechargeProvider implements RechargeProvider {
       WATER: [
         { id: "DELHI_JAL", name: "Delhi Jal Board", serviceType: "WATER", category: "Water" },
         { id: "BWSSB", name: "BWSSB Bangalore", serviceType: "WATER", category: "Water" },
+      ],
+      MOBILE_POSTPAID: [
+        { id: "AIRTEL_POSTPAID", name: "Airtel Postpaid", serviceType: "MOBILE_POSTPAID", category: "Telecom" },
+        { id: "JIO_POSTPAID", name: "Jio Postpaid", serviceType: "MOBILE_POSTPAID", category: "Telecom" },
+      ],
+      LANDLINE: [
+        { id: "AIRTEL_LANDLINE", name: "Airtel Landline", serviceType: "LANDLINE", category: "Landline" },
+        { id: "BSNL_LANDLINE", name: "BSNL Landline", serviceType: "LANDLINE", category: "Landline" },
+      ],
+      INSURANCE: [
+        { id: "LIC", name: "Life Insurance Corporation", serviceType: "INSURANCE", category: "Insurance" },
       ],
     };
 
@@ -222,17 +241,27 @@ export class MockRechargeProvider implements RechargeProvider {
 let activeProvider: RechargeProvider | null = null;
 
 export function getRechargeProvider(): RechargeProvider {
-  if (!activeProvider) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "[Security] No production recharge provider configured. MockRechargeProvider is strictly forbidden in production.",
-      );
-    }
-    activeProvider = new MockRechargeProvider();
+  if (activeProvider) {
+    return activeProvider;
   }
+
+  // If A1Topup credentials are provided, return A1TopupProvider
+  if (process.env.A1TOPUP_PASSWORD) {
+    activeProvider = new A1TopupProvider();
+    return activeProvider;
+  }
+
+  // If running in production without credentials, lockdown strictly
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[Security] No production recharge provider configured. MockRechargeProvider is strictly forbidden in production.",
+    );
+  }
+
+  activeProvider = new MockRechargeProvider();
   return activeProvider;
 }
 
-export function setRechargeProvider(provider: RechargeProvider) {
+export function setRechargeProvider(provider: RechargeProvider | null) {
   activeProvider = provider;
 }

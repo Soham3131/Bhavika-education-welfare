@@ -2,11 +2,14 @@ import { Schema, Document, Model, Connection, Types } from "mongoose";
 
 export const RechargeServiceType = {
   MOBILE_PREPAID: "MOBILE_PREPAID",
+  MOBILE_POSTPAID: "MOBILE_POSTPAID",
   DTH: "DTH",
   FASTAG: "FASTAG",
   ELECTRICITY: "ELECTRICITY",
   GAS: "GAS",
   WATER: "WATER",
+  LANDLINE: "LANDLINE",
+  INSURANCE: "INSURANCE",
 } as const;
 
 export type RechargeServiceType =
@@ -44,12 +47,18 @@ export interface IStoreRechargeOrder {
   status: RechargeStatus;
   providerName: string;
   providerRef?: string | null;
+  operatorCode?: string | null;
+  circleCode?: string | null;
+  operatorRef?: string | null;
+  value1?: string | null;
+  value2?: string | null;
   providerPayoutPaise: number;
   memberCommissionPaise: number;
   commissionStatus: RechargeCommissionStatus;
   paymentMethod: "WALLET" | "ONLINE";
   failureReason?: string | null;
   reconciledAt?: Date | null;
+  apiResponse?: Record<string, unknown> | null;
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -118,6 +127,36 @@ export const StoreRechargeOrderSchema = new Schema<IStoreRechargeOrderDoc>(
       type: String,
       default: null,
       index: true,
+    },
+    operatorCode: {
+      type: String,
+      default: null,
+      trim: true,
+      uppercase: true,
+    },
+    circleCode: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    operatorRef: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    value1: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    value2: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    apiResponse: {
+      type: Schema.Types.Mixed,
+      default: null,
     },
     providerPayoutPaise: {
       type: Number,

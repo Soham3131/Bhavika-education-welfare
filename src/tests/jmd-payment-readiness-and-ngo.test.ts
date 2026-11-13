@@ -23,7 +23,7 @@ import {
   getStoreCategoryModel,
 } from "@/server/store/models";
 import { updateStoreSettings } from "@/server/store/services/settings.service";
-import { getRechargeProvider } from "@/server/store/services/recharge-provider";
+import { getRechargeProvider, setRechargeProvider } from "@/server/store/services/recharge-provider";
 import { confirmPayoutSettlement } from "@/server/store/services/withdrawal.service";
 import { handleProxyRoute } from "@/proxy";
 import { BHAVIKA_REGISTER_URL } from "@/lib/constants";
@@ -249,14 +249,19 @@ describe("Jai Maa Durga — NGO Registration Banner & Payment Readiness Suite", 
 
     it("missing mobile recharge credentials blocks recharge only and does not affect normal checkout", () => {
       const origEnv = process.env.NODE_ENV;
+      const origPass = process.env.A1TOPUP_PASSWORD;
       const envRecord = process.env as Record<string, string | undefined>;
       try {
+        setRechargeProvider(null);
+        delete process.env.A1TOPUP_PASSWORD;
         envRecord.NODE_ENV = "production";
         expect(() => getRechargeProvider()).toThrow(
           /No production recharge provider configured/,
         );
       } finally {
         envRecord.NODE_ENV = origEnv;
+        if (origPass !== undefined) process.env.A1TOPUP_PASSWORD = origPass;
+        else delete process.env.A1TOPUP_PASSWORD;
       }
     });
 
@@ -318,12 +323,12 @@ describe("Jai Maa Durga — NGO Registration Banner & Payment Readiness Suite", 
     it("rewrites root '/' to '/store' when JMD_SITE_MODE is 'true' (JMD Deployment)", () => {
       process.env.JMD_SITE_MODE = "true";
       const res = handleProxyRoute({
-        nextUrl: new URL("https://jai-maa-durga.vercel.app/"),
+        nextUrl: new URL("https://jai-maa-durga-store.vercel.app/"),
         auth: null,
       });
 
       expect(res.headers.get("x-middleware-rewrite")).toBe(
-        "https://jai-maa-durga.vercel.app/store",
+        "https://jai-maa-durga-store.vercel.app/store",
       );
     });
 

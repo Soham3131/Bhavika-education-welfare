@@ -1,6 +1,6 @@
 import "server-only";
 import { Types } from "mongoose";
-import { getStoreDb, withStoreTransaction } from "../db/connect";
+import { getStoreDb } from "../db/connect";
 import {
   getStorePromotionalPlanModel,
   IStorePromotionalPlanDoc,
@@ -109,7 +109,6 @@ export async function updateStorePromotionalPlan(params: {
     throw new DomainError("Promotional plan not found.", 404, "PLAN_NOT_FOUND");
   }
 
-  const updates: Record<string, unknown> = {};
   if (params.name !== undefined) plan.name = params.name;
   if (params.description !== undefined) plan.description = params.description;
   if (params.pricePaise !== undefined) plan.pricePaise = params.pricePaise;

@@ -56,6 +56,7 @@ export default function StoreRechargePage() {
   const [history, setHistory] = useState<RechargeRecord[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [selectedOperator, setSelectedOperator] = useState<string>("");
+  const [selectedCircle, setSelectedCircle] = useState<string>("20"); // Default: Haryana (Circle 20)
   const [consumerNumber, setConsumerNumber] = useState<string>("");
   const [amountRupees, setAmountRupees] = useState<number>(299);
   const [loading, setLoading] = useState<boolean>(true);
@@ -118,6 +119,7 @@ export default function StoreRechargePage() {
           serviceType: activeService,
           operator: selectedOperator,
           consumerNumber,
+          circle: selectedCircle,
           amountRupees,
         }),
       });
@@ -240,6 +242,28 @@ export default function StoreRechargePage() {
                 ))}
               </select>
             </div>
+
+            {activeService === "MOBILE_PREPAID" && (
+              <div>
+                <label className="block text-[11px] font-bold text-ink-600 uppercase mb-1">
+                  Telecom Circle / State
+                </label>
+                <select
+                  value={selectedCircle}
+                  onChange={(e) => setSelectedCircle(e.target.value)}
+                  className="w-full p-2.5 border border-ink-200 rounded-lg text-xs font-bold text-ink-900 bg-white"
+                >
+                  <option value="20">Haryana (Circle 20)</option>
+                  <option value="1">Delhi & NCR (Circle 1)</option>
+                  <option value="8">Punjab (Circle 8)</option>
+                  <option value="7">UP West (Circle 7)</option>
+                  <option value="9">Rajasthan (Circle 9)</option>
+                  <option value="2">Mumbai (Circle 2)</option>
+                  <option value="4">Maharashtra (Circle 4)</option>
+                  <option value="14">Karnataka (Circle 14)</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-[11px] font-bold text-ink-600 uppercase mb-1">

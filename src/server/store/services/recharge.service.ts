@@ -12,6 +12,10 @@ import {
 import { getStoreMemberModel } from "../models/StoreMember";
 import { mutateStoreWallet } from "./wallet-ledger.service";
 import { getRechargeProvider } from "./recharge-provider";
+import {
+  findA1Operator,
+  resolveA1CircleCode,
+} from "./a1topup-mapping";
 import { DomainError } from "@/server/errors";
 
 export interface SubmitRechargeInput {
@@ -21,6 +25,8 @@ export interface SubmitRechargeInput {
   consumerNumber: string;
   circle?: string | null;
   amountPaise: number;
+  value1?: string | null;
+  value2?: string | null;
 }
 
 export function generateRechargeRef(): string {
@@ -125,14 +131,22 @@ export async function submitRechargeOrder(
     );
   }
 
+  const matchedOp = findA1Operator(input.operator);
+  const operatorCode = matchedOp?.code || input.operator.toUpperCase();
+  const circleCode = resolveA1CircleCode(input.circle);
+
   // 2. Create pending order document
   const order = new RechargeOrderModel({
     rechargeRef,
     member: memberObjectId,
     serviceType: input.serviceType,
     operator: input.operator.toUpperCase(),
+    operatorCode,
     consumerNumber: input.consumerNumber.trim(),
     circle: input.circle ? input.circle.toUpperCase() : null,
+    circleCode,
+    value1: input.value1 ? input.value1.trim() : null,
+    value2: input.value2 ? input.value2.trim() : null,
     amountPaise: input.amountPaise,
     status: RechargeStatus.SUBMITTED_TO_PROVIDER,
     providerName: provider.name,
@@ -148,10 +162,14 @@ export async function submitRechargeOrder(
     consumerNumber: input.consumerNumber,
     circle: input.circle,
     amountPaise: input.amountPaise,
+    value1: input.value1,
+    value2: input.value2,
   });
 
   order.providerRef = providerResult.providerRef;
+  order.operatorRef = providerResult.operatorRef || null;
   order.providerPayoutPaise = providerResult.providerPayoutPaise;
+  order.apiResponse = providerResult.rawResponse || null;
 
   if (providerResult.status === "SUCCESS") {
     // 4. Immediate Success: Credit member commission
@@ -424,41 +442,53 @@ export function getRechargeProviderConfigStatus(): {
   message: string;
 } {
   const isProd = process.env.NODE_ENV === "production";
-  const hasCredentials = !!(
+  const hasA1Topup = !!process.env.A1TOPUP_PASSWORD;
+  const hasTelecomAggregator = !!(
     process.env.TELECOM_AGGREGATOR_API_KEY &&
     process.env.TELECOM_AGGREGATOR_SECRET
   );
+  const hasCredentials = hasA1Topup || hasTelecomAggregator;
 
   if (isProd && !hasCredentials) {
     return {
       isConfigured: false,
-      providerName: "NONE",
+      providerName: "A1TOPUP",
       isMock: false,
       canExecuteLive: false,
       message:
-        "Production telecom aggregator credentials are not configured. Live recharge processing is offline.",
+        "Production telecom aggregator credentials (A1TOPUP_PASSWORD) are not configured. Live recharge processing is offline.",
     };
   }
 
+  const providerName = hasA1Topup
+    ? "A1TOPUP"
+    : hasTelecomAggregator
+    ? "PRODUCTION_AGGREGATOR"
+    : "MOCK_PROVIDER";
+
   return {
     isConfigured: true,
-    providerName: hasCredentials ? "PRODUCTION_AGGREGATOR" : "MOCK_PROVIDER",
+    providerName,
     isMock: !hasCredentials,
     canExecuteLive: hasCredentials,
     message: hasCredentials
-      ? "Production telecom aggregator active and configured."
+      ? `${providerName} active and configured.`
       : "Staging/Development mock provider active. Prohibited in production.",
   };
 }
 
 /**
- * Handles asynchronous status webhook callbacks from telecom providers with strict duplicate protection.
+ * Handles asynchronous status webhook / callback notifications from telecom providers with strict duplicate protection
+ * and Status API verification prior to ledger mutation.
  */
 export async function handleRechargeWebhookCallback(input: {
-  providerRef: string;
-  status: "SUCCESS" | "FAILED";
+  providerRef?: string;
+  orderId?: string;
+  status: "SUCCESS" | "FAILED" | "PENDING";
   failureReason?: string;
   providerPayoutPaise?: number;
+  operatorRef?: string;
+  reconcileWithStatusApi?: boolean;
 }): Promise<{
   processed: boolean;
   isDuplicate: boolean;
@@ -469,22 +499,33 @@ export async function handleRechargeWebhookCallback(input: {
   const RechargeOrderModel = getStoreRechargeOrderModel(db);
   const MemberModel = getStoreMemberModel(db);
 
-  const order = await RechargeOrderModel.findOne({
-    providerRef: input.providerRef,
-  });
+  // Ambiguity resolution: check both orderId and providerRef
+  let order: IStoreRechargeOrderDoc | null = null;
+  if (input.orderId) {
+    order = await RechargeOrderModel.findOne({ rechargeRef: input.orderId });
+  }
+  if (!order && input.providerRef) {
+    if (input.providerRef.startsWith("JMD-RCH-")) {
+      order = await RechargeOrderModel.findOne({ rechargeRef: input.providerRef });
+    } else {
+      order = await RechargeOrderModel.findOne({ providerRef: input.providerRef });
+    }
+  }
+
   if (!order) {
     return {
       processed: false,
       isDuplicate: false,
       order: null,
-      message: "Recharge order not found for provider reference.",
+      message: "Recharge order not found for provider reference or order ID.",
     };
   }
 
   // Duplicate callback idempotency check
   if (
     order.status === RechargeStatus.SUCCESS ||
-    order.status === RechargeStatus.FAILED
+    order.status === RechargeStatus.FAILED ||
+    order.status === RechargeStatus.REVERSED
   ) {
     return {
       processed: false,
@@ -494,9 +535,34 @@ export async function handleRechargeWebhookCallback(input: {
     };
   }
 
-  if (input.status === "SUCCESS") {
+  let finalStatus = input.status;
+  let finalFailureReason = input.failureReason;
+  let finalPayoutPaise = input.providerPayoutPaise;
+  let finalOperatorRef = input.operatorRef;
+
+  // Reconcile through Status API if requested (e.g. for unauthenticated GET/POST callbacks)
+  if (input.reconcileWithStatusApi) {
+    const provider = getRechargeProvider();
+    const statusResult = await provider.checkStatus(order.rechargeRef);
+
+    if (statusResult.status === "PENDING") {
+      return {
+        processed: false,
+        isDuplicate: false,
+        order,
+        message: "Status API returned PENDING. Financial ledger untouched awaiting final settlement.",
+      };
+    }
+
+    finalStatus = statusResult.status as "SUCCESS" | "FAILED";
+    if (statusResult.failureReason) finalFailureReason = statusResult.failureReason;
+    if (statusResult.providerPayoutPaise) finalPayoutPaise = statusResult.providerPayoutPaise;
+    if (statusResult.operatorRef) finalOperatorRef = statusResult.operatorRef;
+  }
+
+  if (finalStatus === "SUCCESS") {
     const member = await MemberModel.findById(order.member);
-    const payout = input.providerPayoutPaise ?? order.providerPayoutPaise;
+    const payout = finalPayoutPaise ?? order.providerPayoutPaise;
     const commission = calculateRechargeCommission(
       member?.tier || "FREE",
       payout,
@@ -505,6 +571,7 @@ export async function handleRechargeWebhookCallback(input: {
     order.status = RechargeStatus.SUCCESS;
     order.memberCommissionPaise = commission;
     order.commissionStatus = RechargeCommissionStatus.CREDITED;
+    if (finalOperatorRef) order.operatorRef = finalOperatorRef;
     order.reconciledAt = new Date();
     await order.save();
 
@@ -518,7 +585,7 @@ export async function handleRechargeWebhookCallback(input: {
         referenceType: "REFERRAL_COMMISSION",
         referenceId: order.rechargeRef,
         idempotencyKey: `rch-comm-cb:${order.rechargeRef}`,
-        description: `Webhook confirmed commission for ${order.serviceType} recharge`,
+        description: `Callback confirmed commission for ${order.serviceType} recharge`,
       });
     }
 
@@ -528,10 +595,11 @@ export async function handleRechargeWebhookCallback(input: {
       order,
       message: "Order successfully marked SUCCESS and commission credited.",
     };
-  } else {
+  } else if (finalStatus === "FAILED") {
     order.status = RechargeStatus.FAILED;
     order.failureReason =
-      input.failureReason || "Provider callback reported failure.";
+      finalFailureReason || "Provider callback reported failure.";
+    if (finalOperatorRef) order.operatorRef = finalOperatorRef;
     order.reconciledAt = new Date();
     await order.save();
 
@@ -555,4 +623,11 @@ export async function handleRechargeWebhookCallback(input: {
       message: "Order marked FAILED and principal amount refunded to member.",
     };
   }
+
+  return {
+    processed: false,
+    isDuplicate: false,
+    order,
+    message: "No action taken for PENDING callback notification.",
+  };
 }

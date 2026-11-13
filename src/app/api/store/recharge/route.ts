@@ -18,16 +18,21 @@ import { z } from "zod";
 const submitRechargeSchema = z.object({
   serviceType: z.enum([
     "MOBILE_PREPAID",
+    "MOBILE_POSTPAID",
     "DTH",
     "FASTAG",
     "ELECTRICITY",
     "GAS",
     "WATER",
+    "LANDLINE",
+    "INSURANCE",
   ]),
-  operator: z.string().trim().min(2, "Operator code required"),
-  consumerNumber: z.string().trim().min(4, "Valid consumer number required"),
+  operator: z.string().trim().min(1, "Operator code required"),
+  consumerNumber: z.string().trim().min(3, "Valid consumer number required"),
   circle: z.string().trim().optional(),
   amountRupees: z.number().int().min(1, "Minimum recharge is ₹1"),
+  value1: z.string().trim().optional(),
+  value2: z.string().trim().optional(),
 });
 
 export const GET = handle(async (req) => {
@@ -74,6 +79,8 @@ export const POST = handle(async (req) => {
     consumerNumber: parsed.consumerNumber,
     circle: parsed.circle,
     amountPaise,
+    value1: parsed.value1,
+    value2: parsed.value2,
   });
 
   if (result.status === "FAILED") {

@@ -57,14 +57,23 @@ export const storeSettingsSchema = z.object({
   }),
 
   invoice: z.object({
-    isProductionReady: z.boolean().default(false), // STRICT GATE: blocks official production invoices until legal identity is verified
-    legalEntityName: z.string().trim().default(""),
-    tradeName: z.string().trim().default(""),
-    gstin: z.string().trim().default(""),
-    pan: z.string().trim().default(""),
-    registeredAddress: z.string().trim().default(""),
-    state: z.string().trim().default("Delhi"),
-    stateCode: z.string().trim().default("07"),
+    isProductionReady: z.boolean().default(false), // STRICT GATE: blocks official production invoices until legal identity is verified and GST is confirmed ACTIVE
+    legalEntityName: z.string().trim().default("RAJENDER SINGH"),
+    tradeName: z.string().trim().default("JAI MA DURGA & COMPANY"),
+    businessConstitution: z.string().trim().default("Proprietorship"),
+    udyamNumber: z.string().trim().default("UDYAM-HR-17-0005563"),
+    gstin: z.string().trim().default("06EXVPS0958F2ZR"),
+    pan: z.string().trim().default("EXVPS0958F"),
+    registeredAddress: z
+      .string()
+      .trim()
+      .default("Ramsara Jogiwala Daiyer Road, Rampur Dhani, Sirsa, Haryana - 125055"),
+    district: z.string().trim().default("Sirsa"),
+    state: z.string().trim().default("Haryana"),
+    stateCode: z.string().trim().default("06"),
+    gstStatus: z
+      .enum(["ACTIVE", "SUSPENDED", "PENDING_REACTIVATION"])
+      .default("PENDING_REACTIVATION"),
     invoiceNumberPrefix: z.string().trim().default("JMD"),
     financialYear: z.string().trim().default("26-27"),
     supportEmail: z.string().trim().default("store@bhavikawelfare.org"),
@@ -79,13 +88,17 @@ export const storeSettingsSchema = z.object({
     }),
   }).default({
     isProductionReady: false,
-    legalEntityName: "",
-    tradeName: "",
-    gstin: "",
-    pan: "",
-    registeredAddress: "",
-    state: "Delhi",
-    stateCode: "07",
+    legalEntityName: "RAJENDER SINGH",
+    tradeName: "JAI MA DURGA & COMPANY",
+    businessConstitution: "Proprietorship",
+    udyamNumber: "UDYAM-HR-17-0005563",
+    gstin: "06EXVPS0958F2ZR",
+    pan: "EXVPS0958F",
+    registeredAddress: "Ramsara Jogiwala Daiyer Road, Rampur Dhani, Sirsa, Haryana - 125055",
+    district: "Sirsa",
+    state: "Haryana",
+    stateCode: "06",
+    gstStatus: "PENDING_REACTIVATION",
     invoiceNumberPrefix: "JMD",
     financialYear: "26-27",
     supportEmail: "store@bhavikawelfare.org",

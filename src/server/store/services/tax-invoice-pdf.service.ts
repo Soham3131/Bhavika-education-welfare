@@ -136,10 +136,14 @@ export async function generateOrderTaxInvoicePdf(
         isProductionReady?: boolean;
         legalEntityName?: string;
         tradeName?: string;
+        businessConstitution?: string;
+        udyamNumber?: string;
         gstin?: string;
         registeredAddress?: string;
+        district?: string;
         state?: string;
         stateCode?: string;
+        gstStatus?: "ACTIVE" | "SUSPENDED" | "PENDING_REACTIVATION";
         supportEmail?: string;
         invoiceNumberPrefix?: string;
         financialYear?: string;
@@ -150,8 +154,17 @@ export async function generateOrderTaxInvoicePdf(
 
   const invSettings = settingsDoc?.settings?.invoice;
   const isProduction = invSettings?.isProductionReady === true;
+  const gstStatus = invSettings?.gstStatus;
 
   if (isProduction) {
+    if (gstStatus === "SUSPENDED" || gstStatus === "PENDING_REACTIVATION") {
+      throw new DomainError(
+        "Official tax invoice issuance is restricted: Seller GST registration is currently SUSPENDED or PENDING_REACTIVATION. Tax invoices cannot be issued under suspended status.",
+        422,
+        "GST_REGISTRATION_SUSPENDED",
+      );
+    }
+
     const legalName = invSettings?.legalEntityName?.trim() || "";
     const gstin = invSettings?.gstin?.trim() || "";
     const address = invSettings?.registeredAddress?.trim() || "";
@@ -214,7 +227,7 @@ export async function generateOrderTaxInvoicePdf(
 
   if (!isProduction) {
     page.drawText(
-      "[STAGING DRAFT — NOT FOR OFFICIAL TAX CLAIM — PENDING SELLER REGISTRATION]",
+      "[STAGING DRAFT — NOT FOR OFFICIAL TAX CLAIM — PENDING GST REACTIVATION]",
       {
         x: 40,
         y,
@@ -241,23 +254,16 @@ export async function generateOrderTaxInvoicePdf(
   // 2. Seller and Invoice Meta side by side
   // Left: Seller Info
   const sellerLegalName =
-    invSettings?.legalEntityName?.trim() ||
-    (isProduction
-      ? "JAI MAA DURGA COMMERCIAL JEWELLERS LLP"
-      : "JAI MAA DURGA / BHAVIKA WELFARE & EDUCATION (STAGING)");
-  const sellerTradeName = invSettings?.tradeName?.trim() || "Jai Maa Durga";
+    invSettings?.legalEntityName?.trim() || "RAJENDER SINGH";
+  const sellerTradeName =
+    invSettings?.tradeName?.trim() || "JAI MA DURGA & COMPANY";
   const sellerAddress =
     invSettings?.registeredAddress?.trim() ||
-    (isProduction
-      ? "101 Chandni Chowk, Central Delhi, Delhi - 110006"
-      : "Registered Office: Main Commercial Center, Sector 14, New Delhi");
+    "Ramsara Jogiwala Daiyer Road, Rampur Dhani, Sirsa, Haryana - 125055";
   const sellerGstin =
-    invSettings?.gstin?.trim() ||
-    (isProduction
-      ? "07AAAAA0000A1Z5"
-      : "07AAAFB1234A1Z5 (STAGING PLACEHOLDER)");
-  const sellerState = invSettings?.state?.trim() || "Delhi";
-  const sellerStateCode = invSettings?.stateCode?.trim() || "07";
+    invSettings?.gstin?.trim() || "06EXVPS0958F2ZR";
+  const sellerState = invSettings?.state?.trim() || "Haryana";
+  const sellerStateCode = invSettings?.stateCode?.trim() || "06";
   const sellerEmail =
     invSettings?.supportEmail?.trim() || "store@bhavikawelfare.org";
 
@@ -739,7 +745,7 @@ export async function generateOrderTaxInvoicePdf(
     },
   );
 
-  page.drawText("For JAI MAA DURGA & BHAVIKA WELFARE", {
+  page.drawText(`For ${safe(sellerTradeName || "JAI MA DURGA & COMPANY")}`, {
     x: PAGE_W - 220,
     y: footerY + 12,
     size: 8,

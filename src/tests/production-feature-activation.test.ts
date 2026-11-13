@@ -83,6 +83,7 @@ describe("Production Feature Activation — Lucky Draw, Jewellery GST, and Selle
       },
       invoice: {
         isProductionReady: true, // APPROVED
+        gstStatus: "ACTIVE",
         legalEntityName: "JAI MAA DURGA COMMERCIAL JEWELLERS LLP",
         tradeName: "Jai Maa Durga",
         gstin: "07AAAAA0000A1Z5",
@@ -512,6 +513,7 @@ describe("Production Feature Activation — Lucky Draw, Jewellery GST, and Selle
       await updateStoreSettings({
         invoice: {
           isProductionReady: true,
+          gstStatus: "ACTIVE",
           gstin: "07AAAAA0000A1Z5",
         },
       });

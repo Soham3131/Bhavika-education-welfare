@@ -8,11 +8,8 @@ import {
   ShieldAlert,
   Clock,
   CheckCircle2,
-  XCircle,
   Building,
-  CreditCard,
   AlertCircle,
-  Sparkles,
 } from "lucide-react";
 
 interface WithdrawalItem {

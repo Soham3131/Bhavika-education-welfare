@@ -5,12 +5,10 @@ import Link from "next/link";
 import {
   Sparkles,
   ShieldAlert,
-  ArrowRight,
   CheckCircle2,
   Gift,
   Wallet,
   Lock,
-  Info,
 } from "lucide-react";
 
 interface PromotionalPlanView {

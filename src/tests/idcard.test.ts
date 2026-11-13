@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   submitCard,
-  getMyCard,
   approveCard,
   rejectCard,
   adminIssueCard,

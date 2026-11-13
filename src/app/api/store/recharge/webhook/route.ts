@@ -7,7 +7,9 @@ import { z } from "zod";
 export const runtime = "nodejs";
 
 const webhookSchema = z.object({
-  providerRef: z.string().min(1),
+  providerRef: z.string().optional(),
+  orderId: z.string().optional(),
+  txid: z.string().optional(),
   status: z.enum(["SUCCESS", "FAILED"]),
   failureReason: z.string().optional(),
   providerPayoutPaise: z.number().int().optional(),
@@ -86,7 +88,8 @@ export const POST = handle(async (req) => {
   const parsed = webhookSchema.parse(body);
 
   const result = await handleRechargeWebhookCallback({
-    providerRef: parsed.providerRef,
+    providerRef: parsed.providerRef || parsed.txid,
+    orderId: parsed.orderId,
     status: parsed.status,
     failureReason: parsed.failureReason,
     providerPayoutPaise: parsed.providerPayoutPaise,

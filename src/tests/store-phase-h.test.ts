@@ -136,9 +136,11 @@ describe("Phase H — Integration Verification & Safety Controls", () => {
 
     it("throws when getRechargeProvider() is called in production without a configured provider", () => {
       const originalEnv = process.env.NODE_ENV;
+      const originalPass = process.env.A1TOPUP_PASSWORD;
 
       try {
         (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+        delete process.env.A1TOPUP_PASSWORD;
         // Reset active provider to null
         setRechargeProvider(null as unknown as MockRechargeProvider);
 
@@ -147,6 +149,8 @@ describe("Phase H — Integration Verification & Safety Controls", () => {
         );
       } finally {
         (process.env as Record<string, string | undefined>).NODE_ENV = originalEnv;
+        if (originalPass !== undefined) process.env.A1TOPUP_PASSWORD = originalPass;
+        else delete process.env.A1TOPUP_PASSWORD;
         // Restore non-production mock provider
         setRechargeProvider(new MockRechargeProvider());
       }

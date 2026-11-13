@@ -66,6 +66,12 @@ const schema = z.object({
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 
+  // A1Topup Telecom Aggregator API Integration
+  A1TOPUP_USERNAME: z.string().optional(),
+  A1TOPUP_PASSWORD: z.string().optional(),
+  A1TOPUP_API_BASE_URL: z.string().url().optional(),
+  A1TOPUP_CALLBACK_TOKEN: z.string().optional(),
+
   // Seeding
   SEED_ADMIN_EMAIL: z.string().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
